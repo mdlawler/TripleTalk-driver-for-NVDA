@@ -367,7 +367,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 								if elementIndex >= 3 and item[elementIndex-3] == ':':
 									hasSeconds = True
 								if elementIndex >= 2 and item[elementIndex-1] == '0' and item[elementIndex-2] == '0':
-									if not hasSeconds and item_list[elementIndex-2] != 'o ':
+									if not hasSeconds and item_list and item_list[elementIndex-2] != 'o ':
 										if not item_list: item_list = list(item)
 										item_list[elementIndex	-2] = "zero "
 								if elementIndex == 0 or item[elementIndex-1] == '0':
@@ -403,7 +403,6 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 								if leadingZero:
 									if not item_list: item_list = list(item)
 									item_list[elementIndex] = "zero "
-									log.warning("5 changing to zero element index %d" % elementIndex)
 							else:
 								leadingZero = False
 								moneyString = ""
@@ -417,7 +416,6 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 				# when NVDA sends shortcut characters such as alt n it doesn't put a space after the shortcut and this synthesizer needs that to not run it together the next word
 				if characterMode:
 						text_list.append(" ")
-				log.warning(item)
 			elif isinstance(item, IndexCommand):
 				text_list.append("\x1e\x01%di" % lastSentIndex)
 				nvdaIndexes[lastSentIndex] = item.index

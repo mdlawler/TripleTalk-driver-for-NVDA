@@ -318,7 +318,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 								if elementIndex == 0 or (elementIndex > 0 and (item[elementIndex-1].isnumeric() or item[elementIndex-1].isspace())) and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
 									if not item_list: item_list = list(item)
 									item_list[elementIndex] = " point "
-								if elementIndex+2 in range(itemLen) and item[elementIndex+1] == '0' and item[elementIndex+2].isnumeric and item[elementIndex+2] > '1':
+								if elementIndex+2 in range(itemLen) and item[elementIndex+1] == '0' and item[elementIndex+2].isnumeric and item[elementIndex+2] >= '1':
 									if not item_list: item_list = list(item)
 									item_list[elementIndex+1] = "o "
 								if elementIndex+2 in range(itemLen) and item[elementIndex+1] == '0' and item[elementIndex+2] == '0':

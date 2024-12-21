@@ -7,6 +7,9 @@
 #See the file COPYING for more details.
 
 import threading
+import winAPI
+from winAPI import secureDesktop
+import api
 import synthDriverHandler
 from synthDriverHandler import SynthDriver, synthDoneSpeaking, synthIndexReached 
 from speech.commands import IndexCommand, PitchCommand, CharacterModeCommand
@@ -19,12 +22,13 @@ import os
 import time
 from autoSettingsUtils.driverSetting import DriverSetting
 from autoSettingsUtils.utils import StringParameterInfo
-from utils.security import isRunningOnSecureDesktop
 kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
 kernel32.GetPrivateProfileIntW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.INT, wintypes.LPCWSTR]
 kernel32.WritePrivateProfileStringW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.LPCWSTR]
 dll_file_name = r"\ttusbd.dll"
 USBTT = None
+changedDesktop = False
+settingPauseMode = False
 lastSentIndex = 0
 lastReceivedIndex = 0
 stopIndexing = False
@@ -48,12 +52,39 @@ def is_admin():
 	except:
 		return False
 
+def unload_dll():
+	global USBTT
+	global lastSentIndex
+	global lastReceivedIndex
+	global nvdaIndexes
+	if USBTT:
+		_ctypes.FreeLibrary(USBTT._handle)
+		USBTT = None
+		nvdaIndexes.clear()
+		lastSentIndex = 0
+		lastReceivedIndex = 0
+
 def load_dll(dll_name):
+	global nvdaIndexes
 	global USBTT
 	if not USBTT:
 		path = os.getenv('windir', r"c:\windows")
 		dll_path = path + dll_name
 		USBTT = cdll.LoadLibrary(dll_path)
+		nvdaIndexes = [0] * 100
+
+def desktopChanged(isSecureDesktop):
+	# the TT dll is unhappy if it is loaded by more than one program so unload and reload when the desktop changes since secure desktops use a second copy of NVDA.
+	global changedDesktop
+	global settingPauseMode
+	changedDesktop = True
+	if isSecureDesktop:
+		unload_dll()
+	else:
+		if settingPauseMode:
+			settingPauseMode = False
+			time.sleep(1) # since shellexecute returns immediately we need to give powershell time to execute the script
+		load_dll(dll_file_name)
 
 class IndexingThread(threading.Thread):
 	def run(self):
@@ -65,8 +96,9 @@ class IndexingThread(threading.Thread):
 		global indexReached
 		global indexesAvailable
 		global milliseconds
+		# The TT uses indexes 0-99 so we map the NVDA indexes to this and when we receive a TT index we send back the correct NVDA index
 		while not stopIndexing:
-			if lastSentIndex-1 == lastReceivedIndex:
+			if lastSentIndex-1 == lastReceivedIndex or not USBTT:
 				indexesAvailable.clear()
 				indexesAvailable.wait()
 			time.sleep(milliseconds/1000)
@@ -119,29 +151,35 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 				else:
 					USBTT.USBTT_WriteByte(element)
 		super(synthDriverHandler.SynthDriver,self).__init__()
-		global nvdaIndexes
 		global indexReached
 		global indexesAvailable
-		global stopIndexing
 		global lastSentIndex
 		global lastReceivedIndex
 		indexReached = self.onIndexReached
-		stopIndexing = False
 		lastSentIndex = 0
 		lastReceivedIndex = 0
-		nvdaIndexes = [0] * 100
 		indexesAvailable = threading.Event()
 		indexesAvailable.clear()
 		self.indexingThread = IndexingThread()
 		self.indexingThread.start()
 		self.tt_rate = 4
+		self.tt_rateChanged = False
 		self.nvda_rate = 40
 		self.tt_pitch=50
+		self.tt_pitchChanged = False
 		self.tt_inflection=5
+		self.tt_inflectionChanged = False
 		self.nvda_inflection = 50
 		self.tt_volume = 5
+		self.tt_volumeChanged = False
 		self.nvda_volume = 50
 		self.tt_variant = "0"
+		self.tt_variantChanged = False
+		if not api.getForegroundObject()  == None:
+			self.lastForegroundWindowHandle = api.getForegroundObject().windowHandle
+		else:
+			self.lastForegroundWindowHandle =0 
+		winAPI.secureDesktop.post_secureDesktopStateChange.register(desktopChanged)
 
 	def speak(self, speechSequence):
 		self.pause(False) # the TripleTalk needs to be told to resume it doesn't do it upon receiving new speech and NVDA doesn't send a pause False command before sending new speech
@@ -150,6 +188,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		global lastSentIndex
 		global nvdaIndexes
 		global milliseconds
+		global changedDesktop
 		text_list = []
 		item_list = []
 		characterMode = False
@@ -159,9 +198,10 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		leadingZero = False
 		itemIndex = 0
 		moneyString = ""
+		params = b""
 		totalItems = len(speechSequence) - 1
 		itemLen = 0
-		self.upperAscii = {
+		upperAscii = {
 			128:"euro",
 			129:"",
 			130:"single low-9 quote",
@@ -321,10 +361,11 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 								if elementIndex+2 in range(itemLen) and item[elementIndex+1] == '0' and item[elementIndex+2].isnumeric and item[elementIndex+2] >= '1':
 									if not item_list: item_list = list(item)
 									item_list[elementIndex+1] = "o "
-								if elementIndex+2 in range(itemLen) and item[elementIndex+1] == '0' and item[elementIndex+2] == '0':
+								tempIndex = elementIndex+1
+								while tempIndex in range(itemLen) and item[tempIndex] == '0':
 									if not item_list: item_list = list(item)
-									item_list[elementIndex+1] = "o "
-									item_list[elementIndex+2] = "o "
+									item_list[tempIndex] = "o "
+									tempIndex+=1
 							elif element == ',':
 								if elementIndex > 0 and item[elementIndex-1].isnumeric() and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
 									if not item_list: item_list = list(item)
@@ -335,7 +376,15 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 									if not item[itemIndex].isnumeric() and item[itemIndex] != '.':
 										break
 									elif item[itemIndex] == '.':
-										if itemIndex+2 in range(itemLen) and item[itemIndex+1] == '0' and (item[itemIndex+2] == '0' or not item[itemIndex+2].isnumeric()):
+										if itemIndex+3 in range(itemLen) and item[itemIndex+1].isnumeric() and item[itemIndex+2].isnumeric() and item[itemIndex+3].isnumeric():
+											tempIndex = itemIndex+1
+											while tempIndex in range(itemLen) and item[tempIndex].isnumeric():
+												tempIndex+=1
+											moneyString = item[tempIndex-1]
+											moneyString += " cents "
+											if not item_list: item_list = list(item)
+											item_list[tempIndex-1] = moneyString
+										elif itemIndex+2 in range(itemLen) and item[itemIndex+1] == '0' and (item[itemIndex+2] == '0' or not item[itemIndex+2].isnumeric()):
 											if not item_list: item_list = list(item)
 											item_list[itemIndex+1] = ""
 											item_list[itemIndex+2] = ""
@@ -411,7 +460,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 				if item_list:
 					item = "".join(item_list)
 				if characterMode and len(item) == 1 and ord(item) > 127:
-					item = item.replace(item, self.upperAscii[ord(item)])
+					item = item.replace(item, upperAscii[ord(item)])
 				text_list.append(item)
 				# when NVDA sends shortcut characters such as alt n it doesn't put a space after the shortcut and this synthesizer needs that to not run it together the next word
 				if characterMode:
@@ -431,19 +480,42 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		text = "".join(text_list).replace("\r", "")
 		text = text.encode('ascii', 'replace')
 		textLength = len(text)
-		params = ("\x1e\x01%so\x01%ds\x01%dp\x01%de\x01%dv" % (self.tt_variant, self.tt_rate, self.tt_pitch, self.tt_inflection, self.tt_volume)).encode('ascii', 'replace')
+		# only resend the speech parameters when the foreground window changes or when the desktop changes.
+		# This accounts for self talking apps that might change the speech parameters and the version of NVDA running on the secure desktop doing the same
+		# force this by lying and saying that the variant of the voice has changed because when it changes all parameters have to be resent
+		if self.lastForegroundWindowHandle != api.getForegroundObject().windowHandle:
+			self.tt_variantChanged = True
+			self.lastForegroundWindowHandle = api.getForegroundObject().windowHandle
+		if changedDesktop:
+			self.tt_variantChanged = True
+			changedDesktop = False
+		if self.tt_variantChanged:
+			params = ("\x1e\x01%so\x01%ds\x01%dp\x01%de\x01%dv" % (self.tt_variant, self.tt_rate, self.tt_pitch, self.tt_inflection, self.tt_volume)).encode('ascii', 'replace')
+			self.tt_variantChanged = False
+			self.tt_rateChanged = False
+			self.tt_pitchChanged = False
+			self.tt_volumeChanged = False
+			self.tt_inflectionChanged = False
+		if self.tt_rateChanged:
+			params += ("\x1e\x01%ds" % self.tt_rate).encode('ascii', 'replace')
+			self.tt_rateChanged = False
+		if self.tt_pitchChanged:
+			params += ("\x1e\x01%dp" % self.tt_pitch).encode('ascii', 'replace')
+			self.tt_pitchChanged = False
+		if self.tt_volumeChanged:
+			params += ("\x1e\x01%dv" % self.tt_volume).encode('ascii', 'replace')
+			self.tt_volumeChanged = False
+		if self.tt_inflectionChanged:
+			params += ("\x1e\x01%de" % self.tt_inflection).encode('ascii', 'replace')
+			self.tt_inflectionChanged = False
 		text = b"%s %s" % (params, text)
 		text = text + b"\r"
 		# don't use WriteString because it has performance issues, causes other strange behavior, and is just meant for quick testing
-		#except for the secure desktop which doesn't seem to work right WriteByte
-		if isRunningOnSecureDesktop():
-			USBTT.USBTT_WriteString(text,len(text))
-		else: 
-			for element in text:
-				if element == 0x1e:
-					USBTT.USBTT_WriteByteImmediate(element)
-				else:
-					USBTT.USBTT_WriteByte(element)
+		for element in text:
+			if element == 0x1e:
+				USBTT.USBTT_WriteByteImmediate(element)
+			else:
+				USBTT.USBTT_WriteByte(element)
 		indexesAvailable.set()
 		if characterMode or textLength < 10:
 			milliseconds = 10 # for short strings use 10 milliseconds to keep things responsive
@@ -457,53 +529,52 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		USBTT.USBTT_WriteByteImmediate(0x18)
 
 	def terminate(self):
-		global USBTT
-		global stopIndexing
 		global indexReached
-		global lastSentIndex
-		global lastReceivedIndex
-		global nvdaIndexes
-		if USBTT:
-			_ctypes.FreeLibrary(USBTT._handle)
-			USBTT = None
-			stopIndexing = True
-			indexReached = None
-			nvdaIndexes.clear()
-			lastSentIndex = 0
-			lastReceivedIndex = 0
+		global stopIndexing
+		unload_dll()
+		indexReached = None
+		stopIndexing = True
 
 	def _set_rate(self, rate):
-		self.tt_rate = round(rate/10)
-		self.nvda_rate = rate
-		if self.tt_rate == 10:
-			self.tt_rate = 9
+		if rate != self.tt_rate:
+			self.tt_rateChanged = True
+			self.tt_rate = round(rate/10)
+			self.nvda_rate = rate
+			if self.tt_rate > self.maxRate:
+				self.tt_rate = self.maxRate
 
 	def _get_rate(self):
 		return self.nvda_rate
 
 	def _set_pitch(self, pitch):
-		val = round(self._percentToParam(pitch, self.minPitch, self.maxPitch), -1)
-		if val == 100:
-			val = 99
-		self.tt_pitch = val
+		if pitch != self.tt_pitch:
+			self.tt_pitchChanged = True
+			val = round(self._percentToParam(pitch, self.minPitch, self.maxPitch), -1)
+			if val > self.maxPitch:
+				val = self.maxPitch
+			self.tt_pitch = val
 
 	def _get_pitch(self):
 		return round(self._paramToPercent(self.tt_pitch, self.minPitch, self.maxPitch), -1)
 
 	def _set_inflection(self, inflection):
-		self.tt_inflection = round(inflection/10)
-		self.nvda_inflection = inflection
-		if self.tt_inflection == 10:
-			self.tt_inflection = 9
+		if inflection != self.tt_inflection:
+			self.tt_inflectionChanged = True
+			self.tt_inflection = round(inflection/10)
+			self.nvda_inflection = inflection
+			if self.tt_inflection > self.maxInflection:
+				self.tt_inflection = self.maxInflection
 
 	def _get_inflection(self):
 		return self.nvda_inflection
 
 	def _set_volume(self, volume):
-		self.tt_volume = round(volume/10)
-		self.nvda_volume = volume
-		if self.tt_volume == 10:
-			self.tt_volume = 9
+		if volume != self.tt_volume:
+			self.tt_volumeChanged = True
+			self.tt_volume = round(volume/10)
+			self.nvda_volume = volume
+			if self.tt_volume > self.maxVolume:
+				self.tt_volume = self.maxVolume
 
 	def _get_volume(self):
 		return self.nvda_volume
@@ -514,7 +585,9 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 
 	def _set_variant(self, v):
 		global variants
-		self.tt_variant = v if int(v) in variants else "1"
+		if v != self.tt_variant:
+			self.tt_variantChanged = True
+			self.tt_variant = v if int(v) in variants else "1"
 
 	def _get_variant(self):
 		return self.tt_variant
@@ -544,9 +617,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		return self.pauseModes
 
 	def _set_pauseMode(self, val):
-		global stopIndexing
-		global indexReached
-		global nvdaIndexes
+		global settingPauseMode
 		result = 0
 		writeVal = val
 		val = int(val)	
@@ -562,12 +633,11 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 				if result < 32:
 					result = 0
 			if result:
-				self.terminate()
-				time.sleep(1) # since shellexecute returns immediately we need to give powershell time to execute the script
-				load_dll(dll_file_name)
-				nvdaIndexes = [0] * 100
-				stopIndexing = False
-				indexReached = self.onIndexReached
+				if is_admin():
+					unload_dll()
+					load_dll(dll_file_name)
+				else:
+					settingPauseMode = True
 				self.tt_pauseMode = val
 
 	def _get_pauseMode(self):

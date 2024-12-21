@@ -371,6 +371,9 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 									if not item_list: item_list = list(item)
 									item_list[elementIndex] = ""
 							elif element == '$':
+								if elementIndex > 0 and not item[elementIndex-1].isspace():
+									if not item_list: item_list = list(item)
+									item_list[elementIndex] = " $"
 								itemIndex = elementIndex+1
 								while itemIndex in range(itemLen):
 									if not item[itemIndex].isnumeric() and item[itemIndex] != '.':

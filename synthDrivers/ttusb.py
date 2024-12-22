@@ -45,6 +45,11 @@ variants = {
 	5:"Biff",
 	6:"Skip",
 	7:"Robo Robert" }
+pauseModes={
+	"0": StringParameterInfo("0", _("Normal")),
+	"1": StringParameterInfo("1", _("No Pauses")),
+	"2": StringParameterInfo("2", _("Shorten more than normal")),
+	"3": StringParameterInfo("3", _("Shorten maximum amount")) }
 
 def is_admin():
 	try:
@@ -89,13 +94,6 @@ def desktopChanged(isSecureDesktop):
 class IndexingThread(threading.Thread):
 	def run(self):
 		global lastReceivedIndex
-		global lastSentIndex
-		global nvdaIndexes
-		global USBTT
-		global stopIndexing
-		global indexReached
-		global indexesAvailable
-		global milliseconds
 		# The TT uses indexes 0-99 so we map the NVDA indexes to this and when we receive a TT index we send back the correct NVDA index
 		while not stopIndexing:
 			if lastSentIndex-1 == lastReceivedIndex or not USBTT:
@@ -167,6 +165,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		self.nvda_rate = 40
 		self.tt_pitch=50
 		self.tt_pitchChanged = False
+		self.capPitch = False
 		self.tt_inflection=5
 		self.tt_inflectionChanged = False
 		self.nvda_inflection = 50
@@ -350,7 +349,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 						# remove the comma character only when it is in a number so the synthesizer says numbers correctly
 						# this only seems to matter if you set nopauses=1 in ttusbd.ini in the windows directory
 						# fix issues the synth has pronouncing money
-						if elementIndex < itemIndex: # skip the indexes we already processed for money the previous time through the loop
+						if elementIndex < itemIndex: # skip the indexes we already processed for point or money the previous time through the loop
 							continue
 						itemIndex = 0
 						if element.isnumeric() or element == ':' or element == '$' or element == ',' or element == '.':
@@ -358,14 +357,11 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 								if elementIndex == 0 or (elementIndex > 0 and (item[elementIndex-1].isnumeric() or item[elementIndex-1].isspace())) and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
 									if not item_list: item_list = list(item)
 									item_list[elementIndex] = " point "
-								if elementIndex+2 in range(itemLen) and item[elementIndex+1] == '0' and item[elementIndex+2].isnumeric and item[elementIndex+2] >= '1':
+								itemIndex = elementIndex+1
+								while itemIndex in range(itemLen) and item[itemIndex] == '0':
 									if not item_list: item_list = list(item)
-									item_list[elementIndex+1] = "o "
-								tempIndex = elementIndex+1
-								while tempIndex in range(itemLen) and item[tempIndex] == '0':
-									if not item_list: item_list = list(item)
-									item_list[tempIndex] = "o "
-									tempIndex+=1
+									item_list[itemIndex] = "o "
+									itemIndex+=1
 							elif element == ',':
 								if elementIndex > 0 and item[elementIndex-1].isnumeric() and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
 									if not item_list: item_list = list(item)
@@ -475,6 +471,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 				if lastSentIndex == 100:
 					lastSentIndex = 0
 			elif isinstance(item, PitchCommand):
+				self.capPitch = True
 				offsetPitch = self.tt_pitch + item.offset
 				if offsetPitch > self.maxPitch:
 					offsetPitch = self.maxPitch
@@ -524,6 +521,10 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 			milliseconds = 10 # for short strings use 10 milliseconds to keep things responsive
 		else:
 			milliseconds = 100 # for long strings use 100 milliseconds as to not hammer the synth for index marks and waste CPU
+		# Sometimes the synth can get stuck with the cap pitch offset this forces it to reset pitch after changing pitch offset for caps
+		if self.capPitch:
+			self.tt_pitchChanged = True
+			self.capPitch = False
 
 	def cancel(self):
 		self.pause(False) # the TripleTalk needs to be told to resume it doesn't do it upon receiving new speech and NVDA doesn't send a pause False command before sending new speech
@@ -583,14 +584,12 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		return self.nvda_volume
 
 	def _getAvailableVariants(self):
-		global variants
 		return OrderedDict((str(id), synthDriverHandler.VoiceInfo(str(id), name)) for id, name in variants.items())
 
 	def _set_variant(self, v):
-		global variants
 		if v != self.tt_variant:
 			self.tt_variantChanged = True
-			self.tt_variant = v if int(v) in variants else "1"
+			self.tt_variant = v if int(v) in variants else "0"
 
 	def _get_variant(self):
 		return self.tt_variant
@@ -609,15 +608,8 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		else:
 			USBTT.USBTT_WriteByteImmediate(0x12)
 
-	pauseModes={
-		"0": StringParameterInfo("0", _("Normal")),
-		"1": StringParameterInfo("1", _("No Pauses")),
-		"2": StringParameterInfo("2", _("Shorten more than normal")),
-		"3": StringParameterInfo("3", _("Shorten maximum amount"))
-	}
-	
 	def _get_availablePausemodes(self):
-		return self.pauseModes
+		return pauseModes
 
 	def _set_pauseMode(self, val):
 		global settingPauseMode

@@ -25,7 +25,6 @@ from autoSettingsUtils.utils import StringParameterInfo
 kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
 kernel32.GetPrivateProfileIntW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.INT, wintypes.LPCWSTR]
 kernel32.WritePrivateProfileStringW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.LPCWSTR]
-dll_file_name = r"\ttusbd.dll"
 USBTT = None
 changedDesktop = False
 settingPauseMode = False
@@ -36,20 +35,6 @@ indexReached = None
 indexesAvailable = None
 milliseconds = 100
 nvdaIndexes = [0] * 100
-variants = {
-	0:"Perfect Paul",
-	1:"Vader",
-	2:"Mountain Mike",
-	3:"Precise Pete",
-	4:"Jammin Jimmy",
-	5:"Biff",
-	6:"Skip",
-	7:"Robo Robert" }
-pauseModes={
-	"0": StringParameterInfo("0", _("Normal")),
-	"1": StringParameterInfo("1", _("No Pauses")),
-	"2": StringParameterInfo("2", _("Shorten more than normal")),
-	"3": StringParameterInfo("3", _("Shorten maximum amount")) }
 
 def is_admin():
 	try:
@@ -69,13 +54,13 @@ def unload_dll():
 		lastSentIndex = 0
 		lastReceivedIndex = 0
 
-def load_dll(dll_name):
+def load_dll():
 	global nvdaIndexes
 	global USBTT
 	if not USBTT:
 		path = os.getenv('windir', r"c:\windows")
-		dll_path = path + dll_name
-		USBTT = cdll.LoadLibrary(dll_path)
+		path += r"\ttusbd.dll"
+		USBTT = cdll.LoadLibrary(path)
 		nvdaIndexes = [0] * 100
 
 def desktopChanged(isSecureDesktop):
@@ -89,7 +74,7 @@ def desktopChanged(isSecureDesktop):
 		if settingPauseMode:
 			settingPauseMode = False
 			time.sleep(1) # since shellexecute returns immediately we need to give powershell time to execute the script
-		load_dll(dll_file_name)
+		load_dll()
 
 class IndexingThread(threading.Thread):
 	def run(self):
@@ -133,6 +118,20 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 	maxInflection=9
 	minVolume = 0
 	maxVolume = 9
+	variants = {
+		0:"Perfect Paul",
+		1:"Vader",
+		2:"Mountain Mike",
+		3:"Precise Pete",
+		4:"Jammin Jimmy",
+		5:"Biff",
+		6:"Skip",
+		7:"Robo Robert" }
+	pauseModes={
+		"0": StringParameterInfo("0", _("Normal")),
+		"1": StringParameterInfo("1", _("No Pauses")),
+		"2": StringParameterInfo("2", _("Shorten more than normal")),
+		"3": StringParameterInfo("3", _("Shorten maximum amount")) }
 
 	@classmethod
 	def check(cls):
@@ -140,7 +139,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 
 	def __init__(self):
 		self.tt_pauseMode = kernel32.GetPrivateProfileIntW("ttalk_usb_comm", "nopauses", 0, "ttusbd.ini")
-		load_dll(dll_file_name)
+		load_dll()
 		if USBTT:
 			init_string = b"\x18\x1e\x017b\r"
 			for element in init_string:
@@ -194,135 +193,6 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 			if isinstance(item, CharacterModeCommand):
 				characterMode = item.state
 			elif isinstance(item, str):
-				upperAscii = {
-					128:"euro",
-					129:"",
-					130:"single low-9 quote",
-					131:"f hook",
-					132:"double low-9 quote",
-					133:"horizontal ellipsis",
-					134:"dagger",
-					135:"double dagger",
-					136:"circumflex accent",
-					137:"per mille",
-					138:"S caron",
-					139:"single left-pointing angle quote",
-					140:"ligature OE",
-					141:"",
-					142:"Z caron",
-					143:"",
-					144:"",
-					145:"left single quote",
-					146:"right single quote",
-					147:"left double quote",
-					148:"right double quote",
-					149:"bullet",
-					150:"en dash",
-					151:"em dash",
-					152:"tilde",
-					153:"trade mark",
-					154:"S caron",
-					155:"single right-pointing angle quote",
-					156:"ligature oe",
-					157:"",
-					158:"z caron",
-					159:"Y diaeresis",
-					160:"non-breaking space",
-					161:"inverted exclamation mark",
-					162:"cents",
-					163:"pound",
-					164:"currency",
-					165:"yen",
-					166:"pipe broken vertical bar",
-					167:"section",
-					168:"spacing diaeresis – umlaut",
-					169:"copyright",
-					170:"feminine ordinal",
-					171:"left double-angle quotes",
-					172:"egation",
-					173:"soft hyphen",
-					174:"registered trademark",
-					175:"spacing macron – overline",
-					176:"degree",
-					177:"plus-or-minus",
-					178:"superscript two",
-					179:"superscript three",
-					180:"acute accent",
-					181:"micro",
-					182:"pilcrow",
-					183:"middle dot",
-					184:"spacing cedilla",
-					185:"superscript one",
-					186:"masculine ordinal",
-					187:"right double-angle quotes",
-					188:"one quarter",
-					189:"one half",
-					190:"three quarters",
-					191:"inverted question mark",
-					192:"A grave",
-					193:"A acute",
-					194:"A circumflex",
-					195:"A tilde",
-					196:"A diaeresis",
-					197:"A ring above",
-					198:"A E",
-					199:"C cedilla",
-					200:"E grave",
-					201:"E acute",
-					202:"E circumflex",
-					203:"E diaeresis",
-					204:"I grave",
-					205:"I acute",
-					206:"I circumflex",
-					207:"I diaeresis",
-					208:"ETH",
-					209:"N tilde",
-					210:"O grave",
-					211:"O acute",
-					212:"O circumflex",
-					213:"O tilde",
-					214:"O diaeresis",
-					215:"times",
-					216:"O a slash",
-					217:"U grave",
-					218:"U acute",
-					219:"U circumflex",
-					220:"U diaeresis",
-					221:"Y acute",
-					222:"THORN",
-					223:"sharp s",
-					224:"a grave",
-					225:"a acute",
-					226:"a circumflex",
-					227:"a tilde",
-					228:"a diaeresis",
-					229:"a ring above",
-					230:"a e",
-					231:"c cedilla",
-					232:"e grave",
-					233:"e acute",
-					234:"e circumflex",
-					235:"e diaeresis",
-					236:"i grave",
-					237:"i acute",
-					238:"i circumflex",
-					239:"i diaeresis",
-					240:"eth",
-					241:"n tilde",
-					242:"o grave",
-					243:"o acute",
-					244:"o circumflex",
-					245:"o tilde",
-					246:"o dia,eresis",
-					247:"divided",
-					248:"o slash",
-					249:"u grave",
-					250:"u acute",
-					251:"u circumflex",
-					252:"u diaeresis",
-					253:"y acute",
-					254:"thorn,",
-					255:"y diaeresis" }
 				item_list = []
 				allowOClock = True
 				hasSeconds = False
@@ -449,6 +319,135 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 				if item_list:
 					item = "".join(item_list)
 				if characterMode and len(item) == 1 and ord(item) > 127:
+					upperAscii = {
+						128:"euro",
+						129:"",
+						130:"single low-9 quote",
+						131:"f hook",
+						132:"double low-9 quote",
+						133:"horizontal ellipsis",
+						134:"dagger",
+						135:"double dagger",
+						136:"circumflex accent",
+						137:"per mille",
+						138:"S caron",
+						139:"single left-pointing angle quote",
+						140:"ligature OE",
+						141:"",
+						142:"Z caron",
+						143:"",
+						144:"",
+						145:"left single quote",
+						146:"right single quote",
+						147:"left double quote",
+						148:"right double quote",
+						149:"bullet",
+						150:"en dash",
+						151:"em dash",
+						152:"tilde",
+						153:"trade mark",
+						154:"S caron",
+						155:"single right-pointing angle quote",
+						156:"ligature oe",
+						157:"",
+						158:"z caron",
+						159:"Y diaeresis",
+						160:"non-breaking space",
+						161:"inverted exclamation mark",
+						162:"cents",
+						163:"pound",
+						164:"currency",
+						165:"yen",
+						166:"pipe broken vertical bar",
+						167:"section",
+						168:"spacing diaeresis – umlaut",
+						169:"copyright",
+						170:"feminine ordinal",
+						171:"left double-angle quotes",
+						172:"egation",
+						173:"soft hyphen",
+						174:"registered trademark",
+						175:"spacing macron – overline",
+						176:"degree",
+						177:"plus-or-minus",
+						178:"superscript two",
+						179:"superscript three",
+						180:"acute accent",
+						181:"micro",
+						182:"pilcrow",
+						183:"middle dot",
+						184:"spacing cedilla",
+						185:"superscript one",
+						186:"masculine ordinal",
+						187:"right double-angle quotes",
+						188:"one quarter",
+						189:"one half",
+						190:"three quarters",
+						191:"inverted question mark",
+						192:"A grave",
+						193:"A acute",
+						194:"A circumflex",
+						195:"A tilde",
+						196:"A diaeresis",
+						197:"A ring above",
+						198:"A E",
+						199:"C cedilla",
+						200:"E grave",
+						201:"E acute",
+						202:"E circumflex",
+						203:"E diaeresis",
+						204:"I grave",
+						205:"I acute",
+						206:"I circumflex",
+						207:"I diaeresis",
+						208:"ETH",
+						209:"N tilde",
+						210:"O grave",
+						211:"O acute",
+						212:"O circumflex",
+						213:"O tilde",
+						214:"O diaeresis",
+						215:"times",
+						216:"O a slash",
+						217:"U grave",
+						218:"U acute",
+						219:"U circumflex",
+						220:"U diaeresis",
+						221:"Y acute",
+						222:"THORN",
+						223:"sharp s",
+						224:"a grave",
+						225:"a acute",
+						226:"a circumflex",
+						227:"a tilde",
+						228:"a diaeresis",
+						229:"a ring above",
+						230:"a e",
+						231:"c cedilla",
+						232:"e grave",
+						233:"e acute",
+						234:"e circumflex",
+						235:"e diaeresis",
+						236:"i grave",
+						237:"i acute",
+						238:"i circumflex",
+						239:"i diaeresis",
+						240:"eth",
+						241:"n tilde",
+						242:"o grave",
+						243:"o acute",
+						244:"o circumflex",
+						245:"o tilde",
+						246:"o dia,eresis",
+						247:"divided",
+						248:"o slash",
+						249:"u grave",
+						250:"u acute",
+						251:"u circumflex",
+						252:"u diaeresis",
+						253:"y acute",
+						254:"thorn,",
+						255:"y diaeresis" }
 					item = item.replace(item, upperAscii[ord(item)])
 				text_list.append(item)
 				# when NVDA sends shortcut characters such as alt n it doesn't put a space after the shortcut and this synthesizer needs that to not run it together the next word
@@ -577,12 +576,12 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		return self.nvda_volume
 
 	def _getAvailableVariants(self):
-		return OrderedDict((str(id), synthDriverHandler.VoiceInfo(str(id), name)) for id, name in variants.items())
+		return OrderedDict((str(id), synthDriverHandler.VoiceInfo(str(id), name)) for id, name in self.variants.items())
 
 	def _set_variant(self, v):
 		if v != self.tt_variant:
 			self.tt_variantChanged = True
-			self.tt_variant = v if int(v) in variants else "0"
+			self.tt_variant = v if int(v) in self.variants else "0"
 
 	def _get_variant(self):
 		return self.tt_variant
@@ -602,7 +601,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 			USBTT.USBTT_WriteByteImmediate(0x12)
 
 	def _get_availablePausemodes(self):
-		return pauseModes
+		return self.pauseModes
 
 	def _set_pauseMode(self, val):
 		result = 0
@@ -622,7 +621,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 			if result:
 				if is_admin():
 					unload_dll()
-					load_dll(dll_file_name)
+					load_dll()
 				else:
 					global settingPauseMode
 					settingPauseMode = True

@@ -540,7 +540,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		stopIndexing = True
 
 	def _set_rate(self, rate):
-		if rate != self.tt_rate:
+		if rate != self.nvda_rate:
 			self.tt_rateChanged = True
 			self.tt_rate = round(rate/10)
 			self.nvda_rate = rate
@@ -562,7 +562,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		return round(self._paramToPercent(self.tt_pitch, self.minPitch, self.maxPitch), -1)
 
 	def _set_inflection(self, inflection):
-		if inflection != self.tt_inflection:
+		if inflection != self.nvda_inflection:
 			self.tt_inflectionChanged = True
 			self.tt_inflection = round(inflection/10)
 			self.nvda_inflection = inflection
@@ -573,7 +573,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		return self.nvda_inflection
 
 	def _set_volume(self, volume):
-		if volume != self.tt_volume:
+		if volume != self.nvda_volume:
 			self.tt_volumeChanged = True
 			self.tt_volume = round(volume/10)
 			self.nvda_volume = volume

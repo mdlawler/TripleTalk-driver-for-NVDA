@@ -186,157 +186,146 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		self.pause(False) # the TripleTalk needs to be told to resume it doesn't do it upon receiving new speech and NVDA doesn't send a pause False command before sending new speech
 		if not USBTT:
 			return
-		global lastSentIndex
-		global nvdaIndexes
 		global milliseconds
 		global changedDesktop
 		text_list = []
-		item_list = []
 		characterMode = False
-		textLength = 0
-		allowOClock = True
-		hasSeconds = False
-		leadingZero = False
-		itemIndex = 0
-		moneyString = ""
-		params = b""
-		totalItems = len(speechSequence) - 1
-		itemLen = 0
-		upperAscii = {
-			128:"euro",
-			129:"",
-			130:"single low-9 quote",
-			131:"f hook",
-			132:"double low-9 quote",
-			133:"horizontal ellipsis",
-			134:"dagger",
-			135:"double dagger",
-			136:"circumflex accent",
-			137:"per mille",
-			138:"S caron",
-			139:"single left-pointing angle quote",
-			140:"ligature OE",
-			141:"",
-			142:"Z caron",
-			143:"",
-			144:"",
-			145:"left single quote",
-			146:"right single quote",
-			147:"left double quote",
-			148:"right double quote",
-			149:"bullet",
-			150:"en dash",
-			151:"em dash",
-			152:"tilde",
-			153:"trade mark",
-			154:"S caron",
-			155:"single right-pointing angle quote",
-			156:"ligature oe",
-			157:"",
-			158:"z caron",
-			159:"Y diaeresis",
-			160:"non-breaking space",
-			161:"inverted exclamation mark",
-			162:"cents",
-			163:"pound",
-			164:"currency",
-			165:"yen",
-			166:"pipe broken vertical bar",
-			167:"section",
-			168:"spacing diaeresis – umlaut",
-			169:"copyright",
-			170:"feminine ordinal",
-			171:"left double-angle quotes",
-			172:"egation",
-			173:"soft hyphen",
-			174:"registered trademark",
-			175:"spacing macron – overline",
-			176:"degree",
-			177:"plus-or-minus",
-			178:"superscript two",
-			179:"superscript three",
-			180:"acute accent",
-			181:"micro",
-			182:"pilcrow",
-			183:"middle dot",
-			184:"spacing cedilla",
-			185:"superscript one",
-			186:"masculine ordinal",
-			187:"right double-angle quotes",
-			188:"one quarter",
-			189:"one half",
-			190:"three quarters",
-			191:"inverted question mark",
-			192:"A grave",
-			193:"A acute",
-			194:"A circumflex",
-			195:"A tilde",
-			196:"A diaeresis",
-			197:"A ring above",
-			198:"A E",
-			199:"C cedilla",
-			200:"E grave",
-			201:"E acute",
-			202:"E circumflex",
-			203:"E diaeresis",
-			204:"I grave",
-			205:"I acute",
-			206:"I circumflex",
-			207:"I diaeresis",
-			208:"ETH",
-			209:"N tilde",
-			210:"O grave",
-			211:"O acute",
-			212:"O circumflex",
-			213:"O tilde",
-			214:"O diaeresis",
-			215:"times",
-			216:"O a slash",
-			217:"U grave",
-			218:"U acute",
-			219:"U circumflex",
-			220:"U diaeresis",
-			221:"Y acute",
-			222:"THORN",
-			223:"sharp s",
-			224:"a grave",
-			225:"a acute",
-			226:"a circumflex",
-			227:"a tilde",
-			228:"a diaeresis",
-			229:"a ring above",
-			230:"a e",
-			231:"c cedilla",
-			232:"e grave",
-			233:"e acute",
-			234:"e circumflex",
-			235:"e diaeresis",
-			236:"i grave",
-			237:"i acute",
-			238:"i circumflex",
-			239:"i diaeresis",
-			240:"eth",
-			241:"n tilde",
-			242:"o grave",
-			243:"o acute",
-			244:"o circumflex",
-			245:"o tilde",
-			246:"o dia,eresis",
-			247:"divided",
-			248:"o slash",
-			249:"u grave",
-			250:"u acute",
-			251:"u circumflex",
-			252:"u diaeresis",
-			253:"y acute",
-			254:"thorn,",
-			255:"y diaeresis" }
 		for item in speechSequence:
 			if isinstance(item, CharacterModeCommand):
 				characterMode = item.state
 			elif isinstance(item, str):
-				item_list.clear()
+				upperAscii = {
+					128:"euro",
+					129:"",
+					130:"single low-9 quote",
+					131:"f hook",
+					132:"double low-9 quote",
+					133:"horizontal ellipsis",
+					134:"dagger",
+					135:"double dagger",
+					136:"circumflex accent",
+					137:"per mille",
+					138:"S caron",
+					139:"single left-pointing angle quote",
+					140:"ligature OE",
+					141:"",
+					142:"Z caron",
+					143:"",
+					144:"",
+					145:"left single quote",
+					146:"right single quote",
+					147:"left double quote",
+					148:"right double quote",
+					149:"bullet",
+					150:"en dash",
+					151:"em dash",
+					152:"tilde",
+					153:"trade mark",
+					154:"S caron",
+					155:"single right-pointing angle quote",
+					156:"ligature oe",
+					157:"",
+					158:"z caron",
+					159:"Y diaeresis",
+					160:"non-breaking space",
+					161:"inverted exclamation mark",
+					162:"cents",
+					163:"pound",
+					164:"currency",
+					165:"yen",
+					166:"pipe broken vertical bar",
+					167:"section",
+					168:"spacing diaeresis – umlaut",
+					169:"copyright",
+					170:"feminine ordinal",
+					171:"left double-angle quotes",
+					172:"egation",
+					173:"soft hyphen",
+					174:"registered trademark",
+					175:"spacing macron – overline",
+					176:"degree",
+					177:"plus-or-minus",
+					178:"superscript two",
+					179:"superscript three",
+					180:"acute accent",
+					181:"micro",
+					182:"pilcrow",
+					183:"middle dot",
+					184:"spacing cedilla",
+					185:"superscript one",
+					186:"masculine ordinal",
+					187:"right double-angle quotes",
+					188:"one quarter",
+					189:"one half",
+					190:"three quarters",
+					191:"inverted question mark",
+					192:"A grave",
+					193:"A acute",
+					194:"A circumflex",
+					195:"A tilde",
+					196:"A diaeresis",
+					197:"A ring above",
+					198:"A E",
+					199:"C cedilla",
+					200:"E grave",
+					201:"E acute",
+					202:"E circumflex",
+					203:"E diaeresis",
+					204:"I grave",
+					205:"I acute",
+					206:"I circumflex",
+					207:"I diaeresis",
+					208:"ETH",
+					209:"N tilde",
+					210:"O grave",
+					211:"O acute",
+					212:"O circumflex",
+					213:"O tilde",
+					214:"O diaeresis",
+					215:"times",
+					216:"O a slash",
+					217:"U grave",
+					218:"U acute",
+					219:"U circumflex",
+					220:"U diaeresis",
+					221:"Y acute",
+					222:"THORN",
+					223:"sharp s",
+					224:"a grave",
+					225:"a acute",
+					226:"a circumflex",
+					227:"a tilde",
+					228:"a diaeresis",
+					229:"a ring above",
+					230:"a e",
+					231:"c cedilla",
+					232:"e grave",
+					233:"e acute",
+					234:"e circumflex",
+					235:"e diaeresis",
+					236:"i grave",
+					237:"i acute",
+					238:"i circumflex",
+					239:"i diaeresis",
+					240:"eth",
+					241:"n tilde",
+					242:"o grave",
+					243:"o acute",
+					244:"o circumflex",
+					245:"o tilde",
+					246:"o dia,eresis",
+					247:"divided",
+					248:"o slash",
+					249:"u grave",
+					250:"u acute",
+					251:"u circumflex",
+					252:"u diaeresis",
+					253:"y acute",
+					254:"thorn,",
+					255:"y diaeresis" }
+				item_list = []
 				allowOClock = True
+				hasSeconds = False
 				leadingZero = False
 				moneyString = ""
 				itemIndex = 0
@@ -466,6 +455,8 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 				if characterMode:
 						text_list.append(" ")
 			elif isinstance(item, IndexCommand):
+				global lastSentIndex
+				global nvdaIndexes
 				text_list.append("\x1e\x01%di" % lastSentIndex)
 				nvdaIndexes[lastSentIndex] = item.index
 				lastSentIndex += 1
@@ -478,7 +469,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 					offsetPitch = self.maxPitch
 				text_list.append("\x1e\x01%dp" % offsetPitch)
 
-		text = "".join(text_list).replace("\r", "")
+		text = "".join(text_list)
 		text = text.encode('ascii', 'replace')
 		textLength = len(text)
 		# only resend the speech parameters when the foreground window changes or when the desktop changes.
@@ -490,6 +481,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		if changedDesktop:
 			self.tt_variantChanged = True
 			changedDesktop = False
+		params = b""
 		if self.tt_variantChanged:
 			params = ("\x1e\x01%so\x01%ds\x01%dp\x01%de\x01%dv" % (self.tt_variant, self.tt_rate, self.tt_pitch, self.tt_inflection, self.tt_volume)).encode('ascii', 'replace')
 			self.tt_variantChanged = False
@@ -613,7 +605,6 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		return pauseModes
 
 	def _set_pauseMode(self, val):
-		global settingPauseMode
 		result = 0
 		writeVal = val
 		val = int(val)	
@@ -633,6 +624,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 					unload_dll()
 					load_dll(dll_file_name)
 				else:
+					global settingPauseMode
 					settingPauseMode = True
 				self.tt_pauseMode = val
 

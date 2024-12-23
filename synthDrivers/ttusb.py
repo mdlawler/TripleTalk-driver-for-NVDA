@@ -150,10 +150,12 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 					USBTT.USBTT_WriteByte(element)
 		super(synthDriverHandler.SynthDriver,self).__init__()
 		global indexReached
+		global stopIndexing
 		global indexesAvailable
 		global lastSentIndex
 		global lastReceivedIndex
 		indexReached = self.onIndexReached
+		stopIndexing = False
 		lastSentIndex = 0
 		lastReceivedIndex = 0
 		indexesAvailable = threading.Event()
@@ -440,14 +442,13 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 									leadingZero = True
 								elif elementIndex > 0 and item[elementIndex-1].isspace() and elementIndex+1 in range(itemLen) and not item[elementIndex+1].isspace():
 									leadingZero = True
-								itemIndex = elementIndex
-								while leadingZero and itemIndex in range(itemLen):
-									if item[itemIndex] == ':':
+								tempIndex = elementIndex
+								while leadingZero and tempIndex in range(itemLen):
+									if item[tempIndex] == ':':
 										leadingZero = False
-									elif not item[itemIndex].isnumeric():
+									elif not item[tempIndex].isnumeric():
 										break
-									itemIndex +=1
-								itemIndex = 0 # set it back to 0 since we use it to skip processed money elements when it is > 0
+									tempIndex +=1
 								if leadingZero:
 									if not item_list: item_list = list(item)
 									item_list[elementIndex] = "zero "

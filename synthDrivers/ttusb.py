@@ -118,6 +118,45 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 	maxInflection=9
 	minVolume = 0
 	maxVolume = 9
+	tt_rate = 4
+	tt_rateChanged = False
+	nvda_rate = 40
+	tt_pitch=50
+	tt_pitchChanged = False
+	capPitch = False
+	tt_inflection=5
+	tt_inflectionChanged = False
+	nvda_inflection = 50
+	tt_volume = 5
+	tt_volumeChanged = False
+	nvda_volume = 50
+	tt_variant = "0"
+	tt_variantChanged = False
+	if not api.getForegroundObject()  == None:
+		lastForegroundWindowHandle = api.getForegroundObject().windowHandle
+	else:
+		lastForegroundWindowHandle =0 
+	tt_pauseMode = kernel32.GetPrivateProfileIntW("ttalk_usb_comm", "nopauses", 0, "ttusbd.ini")
+	load_dll()
+	if USBTT:
+		init_string = b"\x18\x1e\x017b\r"
+		for element in init_string:
+			if element == 0x1e:
+				USBTT.USBTT_WriteByteImmediate(element)
+			else:
+				USBTT.USBTT_WriteByte(element)
+	global stopIndexing
+	global indexesAvailable
+	global lastSentIndex
+	global lastReceivedIndex
+	stopIndexing = False
+	lastSentIndex = 0
+	lastReceivedIndex = 0
+	indexesAvailable = threading.Event()
+	indexesAvailable.clear()
+	indexingThread = IndexingThread()
+	indexingThread.start()
+	winAPI.secureDesktop.post_secureDesktopStateChange.register(desktopChanged)
 	variants = {
 		0:"Perfect Paul",
 		1:"Vader",
@@ -136,50 +175,10 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 	@classmethod
 	def check(cls):
 		return True
-
 	def __init__(self):
-		self.tt_pauseMode = kernel32.GetPrivateProfileIntW("ttalk_usb_comm", "nopauses", 0, "ttusbd.ini")
-		load_dll()
-		if USBTT:
-			init_string = b"\x18\x1e\x017b\r"
-			for element in init_string:
-				if element == 0x1e:
-					USBTT.USBTT_WriteByteImmediate(element)
-				else:
-					USBTT.USBTT_WriteByte(element)
-		super(synthDriverHandler.SynthDriver,self).__init__()
 		global indexReached
-		global stopIndexing
-		global indexesAvailable
-		global lastSentIndex
-		global lastReceivedIndex
+		super(synthDriverHandler.SynthDriver,self).__init__()
 		indexReached = self.onIndexReached
-		stopIndexing = False
-		lastSentIndex = 0
-		lastReceivedIndex = 0
-		indexesAvailable = threading.Event()
-		indexesAvailable.clear()
-		self.indexingThread = IndexingThread()
-		self.indexingThread.start()
-		self.tt_rate = 4
-		self.tt_rateChanged = False
-		self.nvda_rate = 40
-		self.tt_pitch=50
-		self.tt_pitchChanged = False
-		self.capPitch = False
-		self.tt_inflection=5
-		self.tt_inflectionChanged = False
-		self.nvda_inflection = 50
-		self.tt_volume = 5
-		self.tt_volumeChanged = False
-		self.nvda_volume = 50
-		self.tt_variant = "0"
-		self.tt_variantChanged = False
-		if not api.getForegroundObject()  == None:
-			self.lastForegroundWindowHandle = api.getForegroundObject().windowHandle
-		else:
-			self.lastForegroundWindowHandle =0 
-		winAPI.secureDesktop.post_secureDesktopStateChange.register(desktopChanged)
 
 	def speak(self, speechSequence):
 		self.pause(False) # the TripleTalk needs to be told to resume it doesn't do it upon receiving new speech and NVDA doesn't send a pause False command before sending new speech

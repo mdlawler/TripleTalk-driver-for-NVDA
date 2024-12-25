@@ -232,8 +232,11 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 									item_list[elementIndex] = " $"
 								itemIndex = elementIndex+1
 								while itemIndex in range(itemLen):
-									if not item[itemIndex].isnumeric() and item[itemIndex] != '.':
+									if not item[itemIndex].isnumeric() and item[itemIndex] != '.' and item[itemIndex] != ',':
 										break
+									elif item[itemIndex] == ',':
+										if not item_list: item_list = list(item)
+										item_list[itemIndex] = ""
 									elif item[itemIndex] == '.':
 										if itemIndex+3 in range(itemLen) and item[itemIndex+1].isnumeric() and item[itemIndex+2].isnumeric() and item[itemIndex+3].isnumeric():
 											tempIndex = itemIndex+1

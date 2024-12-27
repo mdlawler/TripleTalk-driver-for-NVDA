@@ -240,12 +240,22 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 									elif item[itemIndex] == '.':
 										if itemIndex+3 in range(itemLen) and item[itemIndex+1].isnumeric() and item[itemIndex+2].isnumeric() and item[itemIndex+3].isnumeric():
 											tempIndex = itemIndex+1
+											nonZero = True
+											moneyString = " and "
 											while tempIndex in range(itemLen) and item[tempIndex].isnumeric():
+												if not item_list: item_list = list(item)
+												item_list[tempIndex] = ""
+												if item[tempIndex] == '0' and nonZero:
+													moneyString += "zero "
+												else:
+													nonZero = False
+												if item[tempIndex] > '0':
+													moneyString += item[tempIndex]
 												tempIndex+=1
-											moneyString = item[tempIndex-1]
 											moneyString += " cents "
 											if not item_list: item_list = list(item)
 											item_list[tempIndex-1] = moneyString
+											itemIndex = tempIndex-1
 										elif itemIndex+2 in range(itemLen) and item[itemIndex+1] == '0' and (item[itemIndex+2] == '0' or not item[itemIndex+2].isnumeric()):
 											if not item_list: item_list = list(item)
 											item_list[itemIndex+1] = ""

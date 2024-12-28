@@ -330,7 +330,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 								hasSeconds = False
 				if item_list:
 					item = "".join(item_list)
-				if characterMode and len(item) == 1 and ord(item) > 127:
+				if characterMode and itemLen == 1 and ord(item) > 127:
 					upperAscii = {
 						128:"euro",
 						129:"",

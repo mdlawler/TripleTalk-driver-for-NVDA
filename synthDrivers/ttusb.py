@@ -323,11 +323,11 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 								if leadingZero:
 									if not item_list: item_list = list(item)
 									item_list[elementIndex] = "zero "
-							else:
-								leadingZero = False
-								moneyString = ""
-								allowOClock = True
-								hasSeconds = False
+						else:
+							leadingZero = False
+							moneyString = ""
+							allowOClock = True
+							hasSeconds = False
 				if item_list:
 					item = "".join(item_list)
 				if characterMode and itemLen == 1 and ord(item) > 127:

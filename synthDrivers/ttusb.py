@@ -245,10 +245,10 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 											while tempIndex in range(itemLen) and item[tempIndex].isnumeric():
 												if not item_list: item_list = list(item)
 												item_list[tempIndex] = ""
-												if item[tempIndex] == '0' and nonZero:
+												if item[tempIndex] == '0' and isLeadingZero:
 													moneyString += "zero "
 												else:
-													nonZero = False
+													isLeadingZero = False
 												if item[tempIndex] > '0':
 													moneyString += item[tempIndex]
 												tempIndex+=1

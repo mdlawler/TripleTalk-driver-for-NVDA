@@ -212,7 +212,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 						if elementIndex < itemIndex: # skip the indexes we already processed for point or money the previous time through the loop
 							continue
 						itemIndex = 0
-						if element.isnumeric() or element == ':' or element == '$' or element == ',' or element == '.':
+						if element == '0' or element == ':' or element == '$' or element == ',' or element == '.':
 							if element == '.': # make it pronounce decimals correctly
 								if elementIndex == 0 or (elementIndex > 0 and (item[elementIndex-1].isnumeric() or item[elementIndex-1].isspace())) and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
 									if not item_list: item_list = list(item)

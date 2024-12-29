@@ -193,10 +193,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 				characterMode = item.state
 			elif isinstance(item, str):
 				item_list = []
-				allowOClock = True
-				hasSeconds = False
-				leadingZero = False
-				moneyString = ""
+				leadingZero = False # we init this here rather than the '0' block because it is special as it deals with the zeros one at a time through the loop so as not to mess up time code
 				itemIndex = 0
 				itemLen = len(item)
 				for elementIndex, element in enumerate(item):
@@ -285,6 +282,8 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 											item_list[itemIndex+2] = ""
 									itemIndex+=1
 							elif element == ':':
+								allowOClock = True
+								hasSeconds = False
 								if elementIndex >= 3 and item[elementIndex-3] == ':':
 									hasSeconds = True
 								if elementIndex >= 2 and item[elementIndex-1] == '0' and item[elementIndex-2] == '0':
@@ -323,11 +322,6 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 								if leadingZero:
 									if not item_list: item_list = list(item)
 									item_list[elementIndex] = "zero "
-						else:
-							leadingZero = False
-							moneyString = ""
-							allowOClock = True
-							hasSeconds = False
 				if item_list:
 					item = "".join(item_list)
 				upperAscii = {

@@ -193,7 +193,6 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 				characterMode = item.state
 			elif isinstance(item, str):
 				item_list = []
-				leadingZero = False # we init this here rather than the '0' block because it is special as it deals with the zeros one at a time through the loop so as not to mess up time code
 				itemIndex = 0
 				itemLen = len(item)
 				for elementIndex, element in enumerate(item):
@@ -206,7 +205,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 						# remove the comma character only when it is in a number so the synthesizer says numbers correctly
 						# this only seems to matter if you set nopauses=1 in ttusbd.ini in the windows directory
 						# fix issues the synth has pronouncing money
-						if elementIndex < itemIndex: # skip the indexes we already processed for point or money the previous time through the loop
+						if elementIndex < itemIndex: # skip the indexes we already processed for point, leading zeros, or money the previous time through the loop
 							continue
 						itemIndex = 0
 						if element == '0' or element == ':' or element == '$' or element == ',' or element == '.':
@@ -287,7 +286,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 								if elementIndex >= 3 and item[elementIndex-3] == ':':
 									hasSeconds = True
 								if elementIndex >= 2 and item[elementIndex-1] == '0' and item[elementIndex-2] == '0':
-									if not hasSeconds and item_list and item_list[elementIndex-2] != 'o ':
+									if not hasSeconds:
 										if not item_list: item_list = list(item)
 										item_list[elementIndex	-2] = "zero "
 								if elementIndex == 0 or item[elementIndex-1] == '0':
@@ -308,22 +307,25 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 									else:
 										item_list[elementIndex+2] = "zero "
 							elif element == '0':
-								if elementIndex == 0:
-									leadingZero = True
-								elif elementIndex > 0 and item[elementIndex-1].isspace() and elementIndex+1 in range(itemLen) and not item[elementIndex+1].isspace():
-									leadingZero = True
-								tempIndex = elementIndex
-								while leadingZero and tempIndex in range(itemLen):
-									if item[tempIndex] == ':':
-										leadingZero = False
-									elif not item[tempIndex].isnumeric():
-										break
-									tempIndex +=1
-								if leadingZero:
-									if not item_list: item_list = list(item)
-									item_list[elementIndex] = "zero "
+								if elementIndex == 0 or (elementIndex > 0 and item[elementIndex-1].isspace() and elementIndex+1 in range(itemLen) and not item[elementIndex+1].isspace()):
+									tempIndex = elementIndex
+									while tempIndex in range(itemLen):
+										if item[tempIndex] == ':':
+											tempIndex = 0
+											break
+										elif item[tempIndex] != '0':
+											break
+										tempIndex +=1
+									if tempIndex:
+										itemIndex = tempIndex
+										tempIndex -=1
+										if not item_list: item_list = list(item)
+										while tempIndex >= elementIndex:
+											item_list[tempIndex] = "zero "
+											tempIndex -=1
 				if item_list:
 					item = "".join(item_list)
+				log.warning(item)
 				upperAscii = {
 					128:"euro",
 					129:"",

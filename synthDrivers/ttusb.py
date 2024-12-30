@@ -208,124 +208,122 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 						if elementIndex < itemIndex: # skip the indexes we already processed for point, leading zeros, or money the previous time through the loop
 							continue
 						itemIndex = 0
-						if element == '0' or element == ':' or element == '$' or element == ',' or element == '.':
-							if element == '.': # make it pronounce decimals correctly
-								if elementIndex == 0 or (elementIndex > 0 and (item[elementIndex-1].isnumeric() or item[elementIndex-1].isspace())) and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
+						if element == '.': # make it pronounce decimals correctly
+							if elementIndex == 0 or (elementIndex > 0 and (item[elementIndex-1].isnumeric() or item[elementIndex-1].isspace())) and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
+								if not item_list: item_list = list(item)
+								item_list[elementIndex] = " point "
+							itemIndex = elementIndex+1
+							while itemIndex in range(itemLen) and item[itemIndex] == '0':
+								if not item_list: item_list = list(item)
+								item_list[itemIndex] = "o "
+								itemIndex+=1
+						elif element == ',':
+							if elementIndex > 0 and item[elementIndex-1].isnumeric() and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
+								if not item_list: item_list = list(item)
+								item_list[elementIndex] = ""
+						elif element == '$':
+							if elementIndex > 0 and not item[elementIndex-1].isspace():
+								if not item_list: item_list = list(item)
+								item_list[elementIndex] = " $"
+							itemIndex = elementIndex+1
+							while itemIndex in range(itemLen):
+								if not item[itemIndex].isnumeric() and item[itemIndex] != '.' and item[itemIndex] != ',':
+									break
+								elif item[itemIndex] == ',' and itemIndex+1 in range(itemLen) and item[itemIndex+1].isnumeric:
 									if not item_list: item_list = list(item)
-									item_list[elementIndex] = " point "
-								itemIndex = elementIndex+1
-								while itemIndex in range(itemLen) and item[itemIndex] == '0':
-									if not item_list: item_list = list(item)
-									item_list[itemIndex] = "o "
-									itemIndex+=1
-							elif element == ',':
-								if elementIndex > 0 and item[elementIndex-1].isnumeric() and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
-									if not item_list: item_list = list(item)
-									item_list[elementIndex] = ""
-							elif element == '$':
-								if elementIndex > 0 and not item[elementIndex-1].isspace():
-									if not item_list: item_list = list(item)
-									item_list[elementIndex] = " $"
-								itemIndex = elementIndex+1
-								while itemIndex in range(itemLen):
-									if not item[itemIndex].isnumeric() and item[itemIndex] != '.' and item[itemIndex] != ',':
-										break
-									elif item[itemIndex] == ',' and itemIndex+1 in range(itemLen) and item[itemIndex+1].isnumeric:
+									item_list[itemIndex] = ""
+								elif item[itemIndex] == '.':
+									if itemIndex+3 in range(itemLen) and item[itemIndex+1].isnumeric() and item[itemIndex+2].isnumeric() and item[itemIndex+3].isnumeric():
+										tempIndex = itemIndex+1
+										isLeadingZero = True
+										moneyString = " and "
+										while tempIndex in range(itemLen) and item[tempIndex].isnumeric():
+											if not item_list: item_list = list(item)
+											item_list[tempIndex] = ""
+											if item[tempIndex] == '0' and isLeadingZero:
+												moneyString += "zero "
+											else:
+												isLeadingZero = False
+											if item[tempIndex] > '0':
+												moneyString += item[tempIndex]
+											tempIndex+=1
+										moneyString += " cents "
 										if not item_list: item_list = list(item)
-										item_list[itemIndex] = ""
-									elif item[itemIndex] == '.':
-										if itemIndex+3 in range(itemLen) and item[itemIndex+1].isnumeric() and item[itemIndex+2].isnumeric() and item[itemIndex+3].isnumeric():
-											tempIndex = itemIndex+1
-											isLeadingZero = True
+										item_list[tempIndex-1] = moneyString
+										itemIndex = tempIndex-1
+									elif itemIndex+2 in range(itemLen) and item[itemIndex+1] == '0' and (item[itemIndex+2] == '0' or not item[itemIndex+2].isnumeric()):
+										if not item_list: item_list = list(item)
+										item_list[itemIndex+1] = ""
+										item_list[itemIndex+2] = ""
+									elif itemIndex+2 in range(itemLen) and item[itemIndex+1].isnumeric() and item[itemIndex+1] > '0' and not item[itemIndex+2].isnumeric():
+										if not item_list: item_list = list(item)
+										moneyString = " and "
+										moneyString += item_list[itemIndex+1]
+										moneyString += "0 cents "
+										item_list[itemIndex+1] = moneyString
+									elif itemIndex+2 in range(itemLen) and item[itemIndex+1] == '0' and item[itemIndex+2] == '1':
+										if not item_list: item_list = list(item)
+										item_list[itemIndex+1] = "and 1 cent"
+										item_list[itemIndex+2] = ""
+									elif itemIndex+2 in range(itemLen) and item[itemIndex+1].isnumeric() and item[itemIndex+2].isnumeric():
+										if item[itemIndex+1] == '0':
 											moneyString = " and "
-											while tempIndex in range(itemLen) and item[tempIndex].isnumeric():
-												if not item_list: item_list = list(item)
-												item_list[tempIndex] = ""
-												if item[tempIndex] == '0' and isLeadingZero:
-													moneyString += "zero "
-												else:
-													isLeadingZero = False
-												if item[tempIndex] > '0':
-													moneyString += item[tempIndex]
-												tempIndex+=1
+											moneyString += item[itemIndex+2]
 											moneyString += " cents "
-											if not item_list: item_list = list(item)
-											item_list[tempIndex-1] = moneyString
-											itemIndex = tempIndex-1
-										elif itemIndex+2 in range(itemLen) and item[itemIndex+1] == '0' and (item[itemIndex+2] == '0' or not item[itemIndex+2].isnumeric()):
-											if not item_list: item_list = list(item)
-											item_list[itemIndex+1] = ""
-											item_list[itemIndex+2] = ""
-										elif itemIndex+2 in range(itemLen) and item[itemIndex+1].isnumeric() and item[itemIndex+1] > '0' and not item[itemIndex+2].isnumeric():
-											if not item_list: item_list = list(item)
+										elif item[itemIndex+1] >= '1':
 											moneyString = " and "
-											moneyString += item_list[itemIndex+1]
-											moneyString += "0 cents "
-											item_list[itemIndex+1] = moneyString
-										elif itemIndex+2 in range(itemLen) and item[itemIndex+1] == '0' and item[itemIndex+2] == '1':
-											if not item_list: item_list = list(item)
-											item_list[itemIndex+1] = "and 1 cent"
-											item_list[itemIndex+2] = ""
-										elif itemIndex+2 in range(itemLen) and item[itemIndex+1].isnumeric() and item[itemIndex+2].isnumeric():
-											if item[itemIndex+1] == '0':
-												moneyString = " and "
-												moneyString += item[itemIndex+2]
-												moneyString += " cents "
-											elif item[itemIndex+1] >= '1':
-												moneyString = " and "
-												moneyString += item[itemIndex+1]
-												moneyString += item[itemIndex+2]
-												moneyString += " cents "
-											if not item_list: item_list = list(item)
-											item_list[itemIndex+1] = moneyString
-											item_list[itemIndex+2] = ""
-									itemIndex+=1
-							elif element == ':':
-								allowOClock = True
-								hasSeconds = False
-								if elementIndex >= 3 and item[elementIndex-3] == ':':
-									hasSeconds = True
-								if elementIndex >= 2 and item[elementIndex-1] == '0' and item[elementIndex-2] == '0':
-									if not hasSeconds:
+											moneyString += item[itemIndex+1]
+											moneyString += item[itemIndex+2]
+											moneyString += " cents "
 										if not item_list: item_list = list(item)
-										item_list[elementIndex	-2] = "zero "
-								if elementIndex == 0 or item[elementIndex-1] == '0':
-									allowOClock = False
-								if elementIndex >= 2 and item[elementIndex-2] == '1': #for 10 o clock
-									allowOClock = True
-							if element == ':' and elementIndex+2 in range(itemLen) and item[elementIndex+1] == '0':
+										item_list[itemIndex+1] = moneyString
+										item_list[itemIndex+2] = ""
+								itemIndex+=1
+						elif element == ':':
+							allowOClock = True
+							hasSeconds = False
+							if elementIndex >= 3 and item[elementIndex-3] == ':':
+								hasSeconds = True
+							if elementIndex >= 2 and item[elementIndex-1] == '0' and item[elementIndex-2] == '0':
+								if not hasSeconds:
+									if not item_list: item_list = list(item)
+									item_list[elementIndex	-2] = "zero "
+							if elementIndex == 0 or item[elementIndex-1] == '0':
+								allowOClock = False
+							if elementIndex >= 2 and item[elementIndex-2] == '1': #for 10 o clock
+								allowOClock = True
+						if element == ':' and elementIndex+2 in range(itemLen) and item[elementIndex+1] == '0':
+							if not item_list: item_list = list(item)
+							if allowOClock and not hasSeconds:
+								if item[elementIndex+2].isnumeric():
+									item_list[elementIndex+1] = "o "
+							else:
+								item_list[elementIndex+1] = "zero "
+							if item[elementIndex+2] == '0':
 								if not item_list: item_list = list(item)
 								if allowOClock and not hasSeconds:
-									if item[elementIndex+2].isnumeric():
-										item_list[elementIndex+1] = "o "
+									item_list[elementIndex+2] = "clock "
 								else:
-									item_list[elementIndex+1] = "zero "
-								if item[elementIndex+2] == '0':
+									item_list[elementIndex+2] = "zero "
+						elif element == '0':
+							if elementIndex == 0 or (elementIndex > 0 and item[elementIndex-1].isspace() and elementIndex+1 in range(itemLen) and not item[elementIndex+1].isspace()):
+								tempIndex = elementIndex
+								while tempIndex in range(itemLen):
+									if item[tempIndex] == ':':
+										tempIndex = 0
+										break
+									elif item[tempIndex] != '0':
+										break
+									tempIndex +=1
+								if tempIndex:
+									itemIndex = tempIndex
+									tempIndex -=1
 									if not item_list: item_list = list(item)
-									if allowOClock and not hasSeconds:
-										item_list[elementIndex+2] = "clock "
-									else:
-										item_list[elementIndex+2] = "zero "
-							elif element == '0':
-								if elementIndex == 0 or (elementIndex > 0 and item[elementIndex-1].isspace() and elementIndex+1 in range(itemLen) and not item[elementIndex+1].isspace()):
-									tempIndex = elementIndex
-									while tempIndex in range(itemLen):
-										if item[tempIndex] == ':':
-											tempIndex = 0
-											break
-										elif item[tempIndex] != '0':
-											break
-										tempIndex +=1
-									if tempIndex:
-										itemIndex = tempIndex
+									while tempIndex >= elementIndex:
+										item_list[tempIndex] = "zero "
 										tempIndex -=1
-										if not item_list: item_list = list(item)
-										while tempIndex >= elementIndex:
-											item_list[tempIndex] = "zero "
-											tempIndex -=1
 				if item_list:
 					item = "".join(item_list)
-				log.warning(item)
 				upperAscii = {
 					128:"euro",
 					129:"",

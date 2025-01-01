@@ -212,11 +212,10 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 							if elementIndex == 0 or (elementIndex > 0 and (item[elementIndex-1].isnumeric() or item[elementIndex-1].isspace())) and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
 								if not item_list: item_list = list(item)
 								item_list[elementIndex] = " point "
-							itemIndex = elementIndex+1
-							while itemIndex in range(itemLen) and item[itemIndex] == '0':
-								if not item_list: item_list = list(item)
-								item_list[itemIndex] = "o "
-								itemIndex+=1
+								itemIndex = elementIndex+1
+								while itemIndex in range(itemLen) and item[itemIndex] == '0':
+									item_list[itemIndex] = "o "
+									itemIndex+=1
 						elif element == ',':
 							if elementIndex > 0 and item[elementIndex-1].isnumeric() and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
 								if not item_list: item_list = list(item)

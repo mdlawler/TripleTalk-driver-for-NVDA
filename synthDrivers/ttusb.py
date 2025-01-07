@@ -196,8 +196,8 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 				itemIndex = 0
 				itemLen = len(item)
 				for elementIndex, element in enumerate(item):
-					# don't allow the text to contain the control character control-A as this could put the synth in a strange state
-					if ord(element) == 1:
+					# Block everything below 32.  The TT dll does some of this, but it can't block the control char 0x01, flush 0x18, etc and allowing these in the text would cause problems with the synth.
+					if ord(element) < 32:
 						if not item_list: item_list = list(item)
 						item_list[elementIndex] = " "
 					if not characterMode:
@@ -527,7 +527,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		self.pause(False) # the TripleTalk needs to be told to resume it doesn't do it upon receiving new speech and NVDA doesn't send a pause False command before sending new speech
 		if not USBTT:
 			return
-		USBTT.USBTT_WriteByteImmediate(0x18)
+		USBTT.USBTT_WriteByte(0x18) # Use WriteByte instead of WriteByteImmediate because the latter can interrupt during command processing causing partial commands to get spoken
 
 	def terminate(self):
 		global indexReached

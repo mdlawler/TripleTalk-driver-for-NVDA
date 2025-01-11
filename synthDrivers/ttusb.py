@@ -34,7 +34,6 @@ stopIndexing = False
 indexReached = None
 indexesAvailable = None
 milliseconds = 100
-pauseModeOn = False
 nvdaIndexes = [0] * 100
 
 def is_admin():
@@ -599,15 +598,16 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 			synthDoneSpeaking.notify(synth=self)
 
 	def pause(self,switch):
-		global pauseModeOn
+		if not hasattr(SynthDriver.pause, "pauseModeOn"):
+			SynthDriver.pause.pauseModeOn = False
 		if not USBTT:
 			return
 		if switch:
-			pauseModeOn = True
+			SynthDriver.pause.pauseModeOn = True
 			USBTT.USBTT_WriteByteImmediate(0x10)
 		else:
-			if pauseModeOn:
-				pauseModeOn = False
+			if SynthDriver.pause.pauseModeOn:
+				SynthDriver.pause.pauseModeOn = False
 				USBTT.USBTT_WriteByteImmediate(0x12)
 
 	def _get_availablePausemodes(self):

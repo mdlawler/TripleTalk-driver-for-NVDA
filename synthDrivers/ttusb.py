@@ -151,6 +151,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		self.nvda_volume = 50
 		self.tt_variant = "0"
 		self.tt_variantChanged = False
+		self.pauseModeOn = False
 		if not api.getForegroundObject()  == None:
 			self.lastForegroundWindowHandle = api.getForegroundObject().windowHandle
 		else:
@@ -181,7 +182,8 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		super(synthDriverHandler.SynthDriver,self).__init__()
 
 	def speak(self, speechSequence):
-		self.pause(False) # the TripleTalk needs to be told to resume it doesn't do it upon receiving new speech and NVDA doesn't send a pause False command before sending new speech
+		if self.pauseModeOn:
+			self.pause(False) # the TripleTalk needs to be told to resume it doesn't do it upon receiving new speech and NVDA doesn't send a pause False command before sending new speech
 		if not USBTT:
 			return
 		global milliseconds
@@ -200,7 +202,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 					if ord(element) < 32:
 						if not item_list: item_list = list(item)
 						item_list[elementIndex] = " "
-					if not characterMode:
+					elif not characterMode:
 						#fix so that the synthesizer says time correctly and also make it report leading zeros for numbers.
 						# remove the comma character only when it is in a number so the synthesizer says numbers correctly
 						# this only seems to matter if you set nopauses=1 in ttusbd.ini in the windows directory
@@ -453,7 +455,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 					254:"thorn,",
 					255:"y diaeresis" }
 				if characterMode and itemLen == 1 and ord(item) in upperAscii:
-					item = item.replace(item, upperAscii[ord(item)])
+					item = upperAscii[ord(item)]
 				text_list.append(item)
 				# when NVDA sends shortcut characters such as alt n it doesn't put a space after the shortcut and this synthesizer needs that to not run it together the next word
 				if characterMode:
@@ -505,8 +507,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		if self.tt_inflectionChanged:
 			params += ("\x1e\x01%de" % self.tt_inflection).encode('ascii', 'replace')
 			self.tt_inflectionChanged = False
-		text = b"%s %s" % (params, text)
-		text = text + b"\r"
+		text = b"%s %s %s" % (params, text, b"\r")
 		# don't use WriteString because it has performance issues, causes other strange behavior, and is just meant for quick testing
 		for element in text:
 			if element == 0x1e:
@@ -524,7 +525,6 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 			self.capPitch = False
 
 	def cancel(self):
-		self.pause(False) # the TripleTalk needs to be told to resume it doesn't do it upon receiving new speech and NVDA doesn't send a pause False command before sending new speech
 		if not USBTT:
 			return
 		USBTT.USBTT_WriteByte(0x18) # Use WriteByte instead of WriteByteImmediate because the latter can interrupt during command processing causing partial commands to get spoken
@@ -598,16 +598,14 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 			synthDoneSpeaking.notify(synth=self)
 
 	def pause(self,switch):
-		if not hasattr(SynthDriver.pause, "pauseModeOn"):
-			SynthDriver.pause.pauseModeOn = False
 		if not USBTT:
 			return
 		if switch:
-			SynthDriver.pause.pauseModeOn = True
+			self.pauseModeOn = True
 			USBTT.USBTT_WriteByteImmediate(0x10)
 		else:
-			if SynthDriver.pause.pauseModeOn:
-				SynthDriver.pause.pauseModeOn = False
+			if self.pauseModeOn:
+				self.pauseModeOn = False
 				USBTT.USBTT_WriteByteImmediate(0x12)
 
 	def _get_availablePausemodes(self):

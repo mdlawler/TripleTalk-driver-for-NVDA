@@ -33,8 +33,9 @@ lastReceivedIndex = 0
 stopIndexing = False
 indexReached = None
 indexesAvailable = None
-milliseconds = 100
+milliseconds = 200
 nvdaIndexes = [0] * 100
+synthFlushed = True
 
 def is_admin():
 	try:
@@ -80,11 +81,14 @@ class IndexingThread(threading.Thread):
 	def run(self):
 		global lastReceivedIndex
 		# The TT uses indexes 0-99 so we map the NVDA indexes to this and when we receive a TT index we send back the correct NVDA index
+#		log.warning("index thread %d" % threading.current_thread().ident) # uncomment this to get the indexing thread it in the nvda log for performance profiling
 		while not stopIndexing:
-			if lastSentIndex-1 == lastReceivedIndex or not USBTT:
+			if lastSentIndex-1 == lastReceivedIndex or not USBTT or synthFlushed:
 				indexesAvailable.clear()
 				indexesAvailable.wait()
 			time.sleep(milliseconds/1000)
+			if synthFlushed: # when the synth has been flushed there is no need to waste time looking for indexes
+				continue
 			if USBTT:
 				b = USBTT.USBTT_ReadByte()
 			else:
@@ -508,25 +512,29 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 			params += ("\x1e\x01%de" % self.tt_inflection).encode('ascii', 'replace')
 			self.tt_inflectionChanged = False
 		text = b"%s %s %s" % (params, text, b"\r")
+		if characterMode or textLength < 10:
+			milliseconds = 10 # for short strings use 10 milliseconds to keep things responsive
+		else:
+			milliseconds = 200 # for long strings use 200 milliseconds as to not hammer the synth for index marks and waste CPU
+		# Sometimes the synth can get stuck with the cap pitch offset this forces it to reset pitch after changing pitch offset for caps
+		if self.capPitch:
+			self.tt_pitchChanged = True
+			self.capPitch = False
 		# don't use WriteString because it has performance issues, causes other strange behavior, and is just meant for quick testing
 		for element in text:
 			if element == 0x1e:
 				USBTT.USBTT_WriteByteImmediate(element)
 			else:
 				USBTT.USBTT_WriteByte(element)
+		global synthFlushed
+		synthFlushed = False
 		indexesAvailable.set()
-		if characterMode or textLength < 10:
-			milliseconds = 10 # for short strings use 10 milliseconds to keep things responsive
-		else:
-			milliseconds = 100 # for long strings use 100 milliseconds as to not hammer the synth for index marks and waste CPU
-		# Sometimes the synth can get stuck with the cap pitch offset this forces it to reset pitch after changing pitch offset for caps
-		if self.capPitch:
-			self.tt_pitchChanged = True
-			self.capPitch = False
 
 	def cancel(self):
 		if not USBTT:
 			return
+		global synthFlushed
+		synthFlushed = True
 		USBTT.USBTT_WriteByte(0x18) # Use WriteByte instead of WriteByteImmediate because the latter can interrupt during command processing causing partial commands to get spoken
 
 	def terminate(self):

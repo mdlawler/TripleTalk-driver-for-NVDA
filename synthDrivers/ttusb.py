@@ -540,9 +540,11 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 	def terminate(self):
 		global indexReached
 		global stopIndexing
+		global synthFlushed
 		unload_dll()
 		indexReached = None
 		stopIndexing = True
+		synthFlushed = False
 
 	def _set_rate(self, rate):
 		if rate != self.nvda_rate:

@@ -33,7 +33,7 @@ lastReceivedIndex = 0
 stopIndexing = False
 indexReached = None
 indexesAvailable = None
-milliseconds = 200
+milliseconds = 100
 nvdaIndexes = [0] * 100
 synthFlushed = True
 
@@ -515,7 +515,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		if characterMode or textLength < 10:
 			milliseconds = 10 # for short strings use 10 milliseconds to keep things responsive
 		else:
-			milliseconds = 200 # for long strings use 200 milliseconds as to not hammer the synth for index marks and waste CPU
+			milliseconds = 100 # for long strings use 100 milliseconds as to not hammer the synth for index marks and waste CPU
 		# Sometimes the synth can get stuck with the cap pitch offset this forces it to reset pitch after changing pitch offset for caps
 		if self.capPitch:
 			self.tt_pitchChanged = True

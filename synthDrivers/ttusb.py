@@ -78,6 +78,9 @@ def desktopChanged(isSecureDesktop):
 		load_dll()
 
 class IndexingThread(threading.Thread):
+	def __init__(self):
+		threading.Thread.__init__(self)
+		self.daemon = True
 	def run(self):
 		global lastReceivedIndex
 		# The TT uses indexes 0-99 so we map the NVDA indexes to this and when we receive a TT index we send back the correct NVDA index
@@ -156,7 +159,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		self.tt_variant = "0"
 		self.tt_variantChanged = False
 		self.pauseModeOn = False
-		if not api.getForegroundObject()  == None:
+		if not api.getForegroundObject() == None:
 			self.lastForegroundWindowHandle = api.getForegroundObject().windowHandle
 		else:
 			self.lastForegroundWindowHandle =0 
@@ -485,9 +488,10 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		# only resend the speech parameters when the foreground window changes or when the desktop changes.
 		# This accounts for self talking apps that might change the speech parameters and the version of NVDA running on the secure desktop doing the same
 		# force this by lying and saying that the variant of the voice has changed because when it changes all parameters have to be resent
-		if self.lastForegroundWindowHandle != api.getForegroundObject().windowHandle:
-			self.tt_variantChanged = True
-			self.lastForegroundWindowHandle = api.getForegroundObject().windowHandle
+		if not api.getForegroundObject() == None:
+			if self.lastForegroundWindowHandle != api.getForegroundObject().windowHandle:
+				self.tt_variantChanged = True
+				self.lastForegroundWindowHandle = api.getForegroundObject().windowHandle
 		if changedDesktop:
 			self.tt_variantChanged = True
 			changedDesktop = False
@@ -545,6 +549,8 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		indexReached = None
 		stopIndexing = True
 		synthFlushed = False
+		indexesAvailable.set()
+		self.indexingThread.join()
 
 	def _set_rate(self, rate):
 		if rate != self.nvda_rate:

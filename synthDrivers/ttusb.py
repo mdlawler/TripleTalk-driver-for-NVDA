@@ -6,6 +6,7 @@
 #This file is covered by the GNU General Public License.
 #See the file COPYING for more details.
 
+from inspect import currentframe, getframeinfo
 import threading
 import winAPI
 from winAPI import secureDesktop
@@ -27,6 +28,7 @@ kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
 kernel32.GetPrivateProfileIntW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.INT, wintypes.LPCWSTR]
 kernel32.WritePrivateProfileStringW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.LPCWSTR]
 USBTT = None
+exceptionLine = 0
 changedDesktop = False
 settingPauseMode = False
 lastSentIndex = 0
@@ -59,6 +61,7 @@ def unload_dll():
 def load_dll(load):
 	global nvdaIndexes
 	global USBTT
+	global exceptionLine
 	if not USBTT:
 		path = os.getenv('windir', r"c:\windows")
 		path += r"\ttusbd.dll"
@@ -69,16 +72,30 @@ def load_dll(load):
 			if USBTT:
 				if not callable(getattr(USBTT, 'USBTT_WriteByte', None)):
 					USBTT = None
+					frameinfo = getframeinfo(currentframe())
+					exceptionLine = frameinfo.lineno
 				if not callable(getattr(USBTT, 'USBTT_WriteByteImmediate', None)):
 					USBTT = None
+					frameinfo = getframeinfo(currentframe())
+					exceptionLine = frameinfo.lineno
 				if not callable(getattr(USBTT, 'USBTT_ReadByte', None)):
 					USBTT = None
+					frameinfo = getframeinfo(currentframe())
+					exceptionLine = frameinfo.lineno
+			else:
+				frameinfo = getframeinfo(currentframe())
+				exceptionLine = frameinfo.lineno
+				return False
 			if USBTT:
 				nvdaIndexes = [0] * 100
 				return True
 			else:
+				frameinfo = getframeinfo(currentframe())
+				exceptionLine = frameinfo.lineno
 				return False
 		else:
+			frameinfo = getframeinfo(currentframe())
+			exceptionLine = frameinfo.lineno
 			return False
 	else:
 		return True
@@ -195,7 +212,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 				else:
 					USBTT.USBTT_WriteByte(element)
 		else:
-			raise RuntimeError("No TripleTalk drivers available")
+			raise RuntimeError("No TripleTalk drivers available problem line %d" % exceptionLine)
 		global stopIndexing
 		global indexesAvailable
 		global lastSentIndex

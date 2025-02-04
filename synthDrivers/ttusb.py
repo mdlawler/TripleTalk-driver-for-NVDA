@@ -66,8 +66,18 @@ def load_dll(load):
 			if not load:
 				return True
 			USBTT = cdll.LoadLibrary(path)
-			nvdaIndexes = [0] * 100
-			return True
+			if USBTT:
+				if not callable(getattr(USBTT, 'USBTT_WriteByte', None)):
+					USBTT = None
+				if not callable(getattr(USBTT, 'USBTT_WriteByteImmediate', None)):
+					USBTT = None
+				if not callable(getattr(USBTT, 'USBTT_ReadByte', None)):
+					USBTT = None
+			if USBTT:
+				nvdaIndexes = [0] * 100
+				return True
+			else:
+				return False
 		else:
 			return False
 	else:
@@ -184,6 +194,8 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 					USBTT.USBTT_WriteByteImmediate(element)
 				else:
 					USBTT.USBTT_WriteByte(element)
+		else:
+			raise RuntimeError("No TripleTalk drivers available")
 		global stopIndexing
 		global indexesAvailable
 		global lastSentIndex
@@ -575,8 +587,10 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		indexReached = None
 		stopIndexing = True
 		synthFlushed = False
-		indexesAvailable.set()
-		self.indexingThread.join()
+		if not indexesAvailable == None:
+			indexesAvailable.set()
+		if not self.indexingThread == None:
+			self.indexingThread.join()
 
 	def _set_rate(self, rate):
 		if rate != self.nvda_rate:

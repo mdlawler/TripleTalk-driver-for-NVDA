@@ -82,11 +82,6 @@ def load_dll(load):
 					USBTT = None
 					frameinfo = getframeinfo(currentframe())
 					exceptionLine = frameinfo.lineno
-			else:
-				frameinfo = getframeinfo(currentframe())
-				exceptionLine = frameinfo.lineno
-				return False
-			if USBTT:
 				nvdaIndexes = [0] * 100
 				return True
 			else:

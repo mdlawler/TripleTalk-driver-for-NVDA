@@ -19,6 +19,7 @@ import ctypes
 import _ctypes
 from ctypes import *
 import os
+import sys
 import time
 from autoSettingsUtils.driverSetting import DriverSetting
 from autoSettingsUtils.utils import StringParameterInfo
@@ -55,16 +56,27 @@ def unload_dll():
 		lastSentIndex = 0
 		lastReceivedIndex = 0
 
-def load_dll():
+def load_dll(load):
 	global nvdaIndexes
 	global USBTT
 	if not USBTT:
 		path = os.getenv('windir', r"c:\windows")
 		path += r"\ttusbd.dll"
-		USBTT = cdll.LoadLibrary(path)
-		nvdaIndexes = [0] * 100
+		if os.path.exists(path):
+			if not load:
+				return True
+			USBTT = cdll.LoadLibrary(path)
+			nvdaIndexes = [0] * 100
+			return True
+		else:
+			return False
+	else:
+		return True
 
 def desktopChanged(isSecureDesktop):
+	# don't do this if we are running in the slave process as we never want to do unload or load in that process
+	if "slave" in sys.executable.casefold():
+		return
 	# the TT dll is unhappy if it is loaded by more than one program so unload and reload when the desktop changes since secure desktops use a second copy of NVDA.
 	global changedDesktop
 	global settingPauseMode
@@ -75,7 +87,7 @@ def desktopChanged(isSecureDesktop):
 		if settingPauseMode:
 			settingPauseMode = False
 			time.sleep(1) # since shellexecute returns immediately we need to give powershell time to execute the script
-		load_dll()
+		load_dll(True)
 
 class IndexingThread(threading.Thread):
 	def __init__(self):
@@ -134,7 +146,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 
 	@classmethod
 	def check(cls):
-		return True
+		return load_dll(False)
 	def __init__(self):
 		self.minRate = 0
 		self.maxRate = 9
@@ -160,11 +172,11 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		self.tt_variantChanged = False
 		self.pauseModeOn = False
 		if not api.getForegroundObject() == None:
-			self.lastForegroundWindowHandle = api.getForegroundObject().windowHandle
+			self.lastForegroundProcessID = api.getForegroundObject().processID
 		else:
-			self.lastForegroundWindowHandle =0 
+			self.lastForegroundProcessID =0 
 		self.tt_pauseMode = kernel32.GetPrivateProfileIntW("ttalk_usb_comm", "nopauses", 0, "ttusbd.ini")
-		load_dll()
+		load_dll(True)
 		if USBTT:
 			init_string = b"\x18\x1e\x017b\r"
 			for element in init_string:
@@ -214,7 +226,8 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 						# remove the comma character only when it is in a number so the synthesizer says numbers correctly
 						# this only seems to matter if you set nopauses=1 in ttusbd.ini in the windows directory
 						# fix issues the synth has pronouncing money
-						if elementIndex < itemIndex: # skip the indexes we already processed for point, leading zeros, or money the previous time through the loop
+						# stop the synth from saying metric stuff like liters, grams, etc
+						if elementIndex < itemIndex: # skip the indexes we already processed for point, leading zeros, money, or metric stuff the previous time through the loop
 							continue
 						itemIndex = 0
 						if element == '.': # make it pronounce decimals correctly
@@ -229,6 +242,19 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 							if elementIndex > 0 and item[elementIndex-1].isnumeric() and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
 								if not item_list: item_list = list(item)
 								item_list[elementIndex] = ""
+						elif element == ' ' or element == '\t': # stop the synth from saying metric items like liter, gram, etc
+							if elementIndex > 0 and item[elementIndex-1].isnumeric():
+								itemIndex = elementIndex
+								while itemIndex in range(itemLen):
+									if not item[itemIndex].isspace():
+										break
+									if not item_list: item_list = list(item)
+									item_list[itemIndex] = ""
+									itemIndex+=1
+								# don't run numbers previously separated by spaces together and make sure there is a space at the end of the string incase the next string starts with a number
+								if not itemIndex in range(itemLen) or (itemIndex in range(itemLen) and item[itemIndex].isnumeric()):
+									if not item_list: item_list = list(item)
+									item_list[itemIndex-1] = " "
 						elif element == '$':
 							if elementIndex > 0 and not item[elementIndex-1].isspace():
 								if not item_list: item_list = list(item)
@@ -489,9 +515,9 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		# This accounts for self talking apps that might change the speech parameters and the version of NVDA running on the secure desktop doing the same
 		# force this by lying and saying that the variant of the voice has changed because when it changes all parameters have to be resent
 		if not api.getForegroundObject() == None:
-			if self.lastForegroundWindowHandle != api.getForegroundObject().windowHandle:
+			if self.lastForegroundProcessID != api.getForegroundObject().processID:
 				self.tt_variantChanged = True
-				self.lastForegroundWindowHandle = api.getForegroundObject().windowHandle
+				self.lastForegroundProcessID = api.getForegroundObject().processID
 		if changedDesktop:
 			self.tt_variantChanged = True
 			changedDesktop = False
@@ -645,7 +671,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 			if result:
 				if is_admin():
 					unload_dll()
-					load_dll()
+					load_dll(True)
 				else:
 					global settingPauseMode
 					settingPauseMode = True

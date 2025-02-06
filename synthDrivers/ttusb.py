@@ -207,6 +207,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 				else:
 					USBTT.USBTT_WriteByte(element)
 		else:
+			sys.tracebacklimit = 0
 			raise RuntimeError("No TripleTalk drivers available problem line %d" % exceptionLine)
 		global stopIndexing
 		global indexesAvailable

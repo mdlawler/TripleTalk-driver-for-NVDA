@@ -347,7 +347,12 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 										if not item_list: item_list = list(item)
 										moneyString = ". "
 										item_list[itemIndex] = moneyString
-										itemIndex+=1
+										itemIndex+=2
+									elif (item[itemIndex+1] == 'b' or item[itemIndex+1] == 'B') and itemIndex+2 in range(itemLen) and (item[itemIndex+2] == 'y' or item[itemIndex+2] == 'Y'):
+										if not item_list: item_list = list(item)
+										moneyString = ". "
+										item_list[itemIndex] = moneyString
+										itemIndex+=3
 								elif itemIndex in range(itemLen) and item[itemIndex].isalpha():
 									skipString = "bBmM"
 									if item[itemIndex] not in skipString:
@@ -356,6 +361,12 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 										moneyString += item[itemIndex]
 										item_list[itemIndex] = moneyString
 										itemIndex+=1
+									elif (item[itemIndex] == 'b' or item[itemIndex] == 'B') and itemIndex+1 in range(itemLen) and (item[itemIndex+1] == 'y' or item[itemIndex+1] == 'Y'):
+										if not item_list: item_list = list(item)
+										moneyString = "."
+										moneyString += item[itemIndex]
+										item_list[itemIndex] = moneyString
+										itemIndex+=2
 						elif element == ':':
 							allowOClock = True
 							hasSeconds = False

@@ -256,7 +256,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 							continue
 						itemIndex = 0
 						if element == '.': # make it pronounce decimals correctly
-							if elementIndex == 0 or (elementIndex > 0 and (item[elementIndex-1].isnumeric() or item[elementIndex-1].isspace())) and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
+							if elementIndex == 0 or (elementIndex > 0 and (item[elementIndex-1].isnumeric() or item[elementIndex-1] == ' ')) and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
 								if not item_list: item_list = list(item)
 								item_list[elementIndex] = " point "
 								itemIndex = elementIndex+1
@@ -267,11 +267,11 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 							if elementIndex > 0 and item[elementIndex-1].isnumeric() and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
 								if not item_list: item_list = list(item)
 								item_list[elementIndex] = ""
-						elif element == ' ' or element == '\t': # stop the synth from saying metric items like liter, gram, etc
+						elif element == ' ': # stop the synth from saying metric items like liter, gram, etc
 							if elementIndex > 0 and item[elementIndex-1].isnumeric():
 								itemIndex = elementIndex
 								while itemIndex in range(itemLen):
-									if not item[itemIndex].isspace():
+									if not item[itemIndex] == ' ':
 										break
 									if not item_list: item_list = list(item)
 									item_list[itemIndex] = ""
@@ -281,7 +281,8 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 									if not item_list: item_list = list(item)
 									item_list[itemIndex-1] = " "
 						elif element == '$':
-							if elementIndex > 0 and not item[elementIndex-1].isspace():
+							pointNotFound = True
+							if elementIndex > 0 and not item[elementIndex-1] == ' ':
 								if not item_list: item_list = list(item)
 								item_list[elementIndex] = " $"
 							itemIndex = elementIndex+1
@@ -292,6 +293,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 									if not item_list: item_list = list(item)
 									item_list[itemIndex] = ""
 								elif item[itemIndex] == '.':
+									pointNotFound = False
 									if itemIndex+3 in range(itemLen) and item[itemIndex+1].isnumeric() and item[itemIndex+2].isnumeric() and item[itemIndex+3].isnumeric():
 										tempIndex = itemIndex+1
 										isLeadingZero = True
@@ -338,6 +340,22 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 										item_list[itemIndex+1] = moneyString
 										item_list[itemIndex+2] = ""
 								itemIndex+=1
+							if pointNotFound:
+								if itemIndex+1 in range(itemLen) and item[itemIndex] == ' ' and item[itemIndex+1].isalpha():
+									skipString = "bBmM"
+									if item[itemIndex+1] not in skipString:
+										if not item_list: item_list = list(item)
+										moneyString = ". "
+										item_list[itemIndex] = moneyString
+										itemIndex+=1
+								elif itemIndex in range(itemLen) and item[itemIndex].isalpha():
+									skipString = "bBmM"
+									if item[itemIndex] not in skipString:
+										if not item_list: item_list = list(item)
+										moneyString = "."
+										moneyString += item[itemIndex]
+										item_list[itemIndex] = moneyString
+										itemIndex+=1
 						elif element == ':':
 							allowOClock = True
 							hasSeconds = False
@@ -365,7 +383,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 								else:
 									item_list[elementIndex+2] = "zero "
 						elif element == '0':
-							if elementIndex == 0 or (elementIndex > 0 and item[elementIndex-1].isspace() and elementIndex+1 in range(itemLen) and not item[elementIndex+1].isspace()):
+							if elementIndex == 0 or (elementIndex > 0 and item[elementIndex-1] == ' ' and elementIndex+1 in range(itemLen) and not item[elementIndex+1] == ' '):
 								tempIndex = elementIndex
 								while tempIndex in range(itemLen):
 									if item[tempIndex] == ':':

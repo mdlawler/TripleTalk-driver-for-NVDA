@@ -1,5 +1,6 @@
 The following time and money amounts have problems that I've corrected in the driver.
 This file also has phrases to test pause mode.
+There are also items to test elimination of the synth saying metric units for items.
 
 6:00 6:00
 6:01:03 6:01:03
@@ -72,3 +73,17 @@ $7.72337
 $7.00037
 $7.00370
 $7.00000
+6ml
+6l
+6 ml
+6 l
+6ml 6l 6g 6 g  6 ml 6  l $10 d
+$10 b
+$10 m
+$10 M
+$10 i
+$10d
+$10b
+$10m
+$10M
+$10i

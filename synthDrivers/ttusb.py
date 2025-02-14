@@ -197,6 +197,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 			self.lastForegroundProcessID = api.getForegroundObject().processID
 		else:
 			self.lastForegroundProcessID =0 
+		self.previousMetric = False
 		self.tt_pauseMode = kernel32.GetPrivateProfileIntW("ttalk_usb_comm", "nopauses", 0, "ttusbd.ini")
 		load_dll(True)
 		if USBTT:
@@ -241,6 +242,19 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 				item_list = []
 				itemIndex = 0
 				itemLen = len(item)
+				if self.previousMetric:
+					# the previous string ended with a number so put a space at the beginning of this one as not to run numbers together	
+					# We have to do it this way instead of just adding a space at the end of the previous string while processing it
+					# because programs like excel can send something like "28  " "l 16  " in two separate strings
+					# and our metric processing would turn it into "28" "l 16" blocking the metric processing, but if the next string
+					# starts with a number we have to prefix it with a space
+					# if we do it while processing the previous string we'll get "28 " "l 16 " which won't block the metric processing
+					self.previousMetric = False
+					if itemLen and not characterMode and item[0].isnumeric():
+						if not item_list: item_list = list(item)
+						metricString = " "
+						metricString += item[0]
+						item_list[0] = metricString
 				for elementIndex, element in enumerate(item):
 					# Block everything below 32.  The TT dll does some of this, but it can't block the control char 0x01, flush 0x18, etc and allowing these in the text would cause problems with the synth.
 					if ord(element) < 32:
@@ -276,8 +290,9 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 									if not item_list: item_list = list(item)
 									item_list[itemIndex] = ""
 									itemIndex+=1
-								# don't run numbers previously separated by spaces together and make sure there is a space at the end of the string incase the next string starts with a number
-								if not itemIndex in range(itemLen) or (itemIndex in range(itemLen) and item[itemIndex].isnumeric()):
+								if not itemIndex in range(itemLen): # set previousMetric since we are at the end of this string so we can handle it at the beginning of the next string
+									self.previousMetric = True
+								if itemIndex in range(itemLen) and item[itemIndex].isnumeric(): # don't run numbers previously separated by spaces together
 									if not item_list: item_list = list(item)
 									item_list[itemIndex-1] = " "
 						elif element == '$':

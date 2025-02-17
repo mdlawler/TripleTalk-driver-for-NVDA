@@ -269,7 +269,11 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 						if elementIndex < itemIndex: # skip the indexes we already processed for point, leading zeros, money, or metric stuff the previous time through the loop
 							continue
 						itemIndex = 0
-						if element == '.': # make it pronounce decimals correctly
+						if element	 == 'M' and elementIndex+2 in range(itemLen) and item[elementIndex+1] == 'c' and item[elementIndex+2] == ' ':
+							# NVDA splitting words of mixed case is bad for things like McDonalds so prevent it
+							if not item_list: item_list = list(item)
+							item_list[elementIndex+2] = ""
+						elif element == '.': # make it pronounce decimals correctly
 							if elementIndex == 0 or (elementIndex > 0 and (item[elementIndex-1].isnumeric() or item[elementIndex-1] == ' ')) and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
 								if not item_list: item_list = list(item)
 								item_list[elementIndex] = " point "

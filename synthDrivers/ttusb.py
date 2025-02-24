@@ -32,7 +32,7 @@ exceptionLine = 0
 changedDesktop = False
 settingPauseMode = False
 lastSentIndex = 0
-lastReceivedIndex = 0
+lastReceivedIndex = -1
 stopIndexing = False
 indexReached = None
 indexesAvailable = None
@@ -56,7 +56,7 @@ def unload_dll():
 		USBTT = None
 		nvdaIndexes.clear()
 		lastSentIndex = 0
-		lastReceivedIndex = 0
+		lastReceivedIndex = -1
 
 def load_dll(load):
 	global nvdaIndexes
@@ -117,10 +117,14 @@ class IndexingThread(threading.Thread):
 		self.daemon = True
 	def run(self):
 		global lastReceivedIndex
+		global synthFlushed
 		# The TT uses indexes 0-99 so we map the NVDA indexes to this and when we receive a TT index we send back the correct NVDA index
 #		log.warning("index thread %d" % threading.current_thread().ident) # uncomment this to get the indexing thread it in the nvda log for performance profiling
 		while not stopIndexing:
-			if lastSentIndex-1 == lastReceivedIndex or not USBTT or synthFlushed:
+			if lastSentIndex-1 == lastReceivedIndex:
+				# we've received all sent indexes so set synthFlushed to True to notify the index thread to wait and the cancel routine to no longer send flushes until more text is being sent.
+				synthFlushed = True
+			if synthFlushed or not USBTT:
 				indexesAvailable.clear()
 				indexesAvailable.wait()
 			time.sleep(milliseconds/1000)
@@ -217,7 +221,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		global indexReached
 		stopIndexing = False
 		lastSentIndex = 0
-		lastReceivedIndex = 0
+		lastReceivedIndex = -1
 		indexesAvailable = threading.Event()
 		indexesAvailable.clear()
 		indexReached = self.onIndexReached
@@ -266,13 +270,35 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 						# this only seems to matter if you set nopauses=1 in ttusbd.ini in the windows directory
 						# fix issues the synth has pronouncing money
 						# stop the synth from saying metric stuff like liters, grams, etc
-						if elementIndex < itemIndex: # skip the indexes we already processed for point, leading zeros, money, or metric stuff the previous time through the loop
+						# fix date stuff like 1st, 2nd, 3rd, 4th, etc
+						if elementIndex < itemIndex: # skip the indexes we already processed for point, leading zeros, money, metric stuff, or date stuff the previous time through the loop
 							continue
 						itemIndex = 0
-						if element	 == 'M' and elementIndex+2 in range(itemLen) and item[elementIndex+1] == 'c' and item[elementIndex+2] == ' ':
+						if element == 'M' and elementIndex+2 in range(itemLen) and item[elementIndex+1] == 'c' and item[elementIndex+2] == ' ':
 							# NVDA splitting words of mixed case is bad for things like McDonalds so prevent it
 							if not item_list: item_list = list(item)
 							item_list[elementIndex+2] = ""
+						elif (((element == 'n' or element == 'N' or element == 'r' or element == 'R') and elementIndex+1 in range(itemLen) and (item[elementIndex+1] == 'd' or item[elementIndex+1] == 'D')) or
+							((element == 's' or element == 'S') and elementIndex+1 in range(itemLen) and (item[elementIndex+1] == 't' or item[elementIndex+1] == 'T')) or
+							((element == 't' or element == 'T') and elementIndex+1 in range(itemLen) and (item[elementIndex+1] == 'h' or item[elementIndex+1] == 'H')
+							and elementIndex+2 in range(itemLen) and item[elementIndex+2] == ' ')):
+							# prevent the synth from doing date stuff like 21st being twenty first instead of 21 st etc.
+							tempIndex = elementIndex-1
+							while tempIndex >= 0:
+								if not item[tempIndex] == ' ':
+									break
+								tempIndex-=1
+							if tempIndex>= 0 and item[tempIndex].isnumeric():
+								if element == 's' or element == 'S':
+									if not item_list: item_list = list(item)
+									tempString = item[tempIndex]
+									tempString += ","
+									item_list[tempIndex] = tempString
+								if not item_list: item_list = list(item)
+								tempString = item[elementIndex]
+								tempString += " "
+								item_list[elementIndex] = tempString
+								itemIndex = elementIndex+3 # skip the chars we just processed
 						elif element == '.': # make it pronounce decimals correctly
 							if elementIndex == 0 or (elementIndex > 0 and (item[elementIndex-1].isnumeric() or item[elementIndex-1] == ' ')) and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
 								if not item_list: item_list = list(item)
@@ -634,9 +660,9 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		indexesAvailable.set()
 
 	def cancel(self):
-		if not USBTT:
-			return
 		global synthFlushed
+		if synthFlushed or not USBTT:
+			return
 		synthFlushed = True
 		USBTT.USBTT_WriteByte(0x18) # Use WriteByte instead of WriteByteImmediate because the latter can interrupt during command processing causing partial commands to get spoken
 

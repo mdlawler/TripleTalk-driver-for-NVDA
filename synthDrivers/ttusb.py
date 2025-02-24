@@ -281,24 +281,18 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 						elif (((element == 'n' or element == 'N' or element == 'r' or element == 'R') and elementIndex+1 in range(itemLen) and (item[elementIndex+1] == 'd' or item[elementIndex+1] == 'D')) or
 						((element == 's' or element == 'S') and elementIndex+1 in range(itemLen) and (item[elementIndex+1] == 't' or item[elementIndex+1] == 'T')) or
 						((element == 't' or element == 'T') and elementIndex+1 in range(itemLen) and (item[elementIndex+1] == 'h' or item[elementIndex+1] == 'H'))):
-							if elementIndex+2 in range(itemLen) and item[elementIndex+2] == ' ':
-								# prevent the synth from doing date stuff like 21st being twenty first instead of 21 st etc.
-								tempIndex = elementIndex-1
-								while tempIndex >= 0:
-									if not item[tempIndex] == ' ':
-										break
-									tempIndex-=1
-								if tempIndex>= 0 and item[tempIndex].isnumeric():
-									if element == 's' or element == 'S':
-										if not item_list: item_list = list(item)
-										tempString = item[tempIndex]
-										tempString += ","
-										item_list[tempIndex] = tempString
-									if not item_list: item_list = list(item)
-									tempString = item[elementIndex]
-									tempString += " "
-									item_list[elementIndex] = tempString
-									itemIndex = elementIndex+3 # skip the chars we just processed
+							# prevent the synth from doing date stuff like 21st being twenty first instead of 21 st etc.
+							tempIndex = elementIndex-1
+							while tempIndex >= 0:
+								if not item[tempIndex] == ' ':
+									break
+								tempIndex-=1
+							if tempIndex>= 0 and item[tempIndex].isnumeric():
+								if not item_list: item_list = list(item)
+								tempString = item[tempIndex]
+								tempString += ","
+								item_list[tempIndex] = tempString
+								itemIndex = elementIndex+2 # skip the chars we just processed
 						elif element == '.': # make it pronounce decimals correctly
 							if elementIndex == 0 or (elementIndex > 0 and (item[elementIndex-1].isnumeric() or item[elementIndex-1] == ' ')) and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
 								if not item_list: item_list = list(item)

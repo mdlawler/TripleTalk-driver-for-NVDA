@@ -290,7 +290,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 								tempString += ","
 								item_list[tempIndex] = tempString
 								itemIndex = elementIndex+2 # skip the chars we just processed
-						if element == '.': # make it pronounce decimals correctly
+						elif element == '.': # make it pronounce decimals correctly
 							if elementIndex == 0 or (elementIndex > 0 and (item[elementIndex-1].isnumeric() or
 							item[elementIndex-1] == ' ')) and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
 								if not item_list: item_list = list(item)

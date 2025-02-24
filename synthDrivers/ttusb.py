@@ -271,14 +271,11 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 						# fix issues the synth has pronouncing money
 						# stop the synth from saying metric stuff like liters, grams, etc
 						# fix date stuff like 1st, 2nd, 3rd, 4th, etc
+						# fix words that NVDA splits that it shouldn't like McDonalds
 						if elementIndex < itemIndex: # skip the indexes we already processed for point, leading zeros, money, metric stuff, or date stuff the previous time through the loop
 							continue
 						itemIndex = 0
-						if element == 'M' and elementIndex+2 in range(itemLen) and item[elementIndex+1] == 'c' and item[elementIndex+2] == ' ':
-							# NVDA splitting words of mixed case is bad for things like McDonalds so prevent it
-							if not item_list: item_list = list(item)
-							item_list[elementIndex+2] = ""
-						elif (((element == 'n' or element == 'N' or element == 'r' or element == 'R') and elementIndex+1 in range(itemLen) and (item[elementIndex+1] == 'd' or item[elementIndex+1] == 'D')) or
+						if (((element == 'n' or element == 'N' or element == 'r' or element == 'R') and elementIndex+1 in range(itemLen) and (item[elementIndex+1] == 'd' or item[elementIndex+1] == 'D')) or
 						((element == 's' or element == 'S') and elementIndex+1 in range(itemLen) and (item[elementIndex+1] == 't' or item[elementIndex+1] == 'T')) or
 						((element == 't' or element == 'T') and elementIndex+1 in range(itemLen) and (item[elementIndex+1] == 'h' or item[elementIndex+1] == 'H'))):
 							# prevent the synth from doing date stuff like 21st being twenty first instead of 21 st etc.
@@ -293,8 +290,9 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 								tempString += ","
 								item_list[tempIndex] = tempString
 								itemIndex = elementIndex+2 # skip the chars we just processed
-						elif element == '.': # make it pronounce decimals correctly
-							if elementIndex == 0 or (elementIndex > 0 and (item[elementIndex-1].isnumeric() or item[elementIndex-1] == ' ')) and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
+						if element == '.': # make it pronounce decimals correctly
+							if elementIndex == 0 or (elementIndex > 0 and (item[elementIndex-1].isnumeric() or
+							item[elementIndex-1] == ' ')) and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
 								if not item_list: item_list = list(item)
 								item_list[elementIndex] = " point "
 								itemIndex = elementIndex+1
@@ -305,8 +303,12 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 							if elementIndex > 0 and item[elementIndex-1].isnumeric() and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
 								if not item_list: item_list = list(item)
 								item_list[elementIndex] = ""
-						elif element == ' ': # stop the synth from saying metric items like liter, gram, etc
-							if elementIndex > 0 and item[elementIndex-1].isnumeric():
+						elif element == ' ': # stop the synth from saying metric items like liter, gram, etc and fix words like McDonalds
+							# NVDA splitting words of mixed case is bad for things like McDonalds so prevent it
+							if elementIndex >= 2 and item[elementIndex-1] == 'c' and item[elementIndex-2] == 'M':
+								if not item_list: item_list = list(item)
+								item_list[elementIndex] = ""
+							elif elementIndex > 0 and item[elementIndex-1].isnumeric():
 								itemIndex = elementIndex
 								while itemIndex in range(itemLen):
 									if not item[itemIndex] == ' ':

@@ -74,10 +74,6 @@ def load_dll(load):
 					USBTT = None
 					frameinfo = getframeinfo(currentframe())
 					exceptionLine = frameinfo.lineno
-				if not callable(getattr(USBTT, 'USBTT_WriteByteImmediate', None)):
-					USBTT = None
-					frameinfo = getframeinfo(currentframe())
-					exceptionLine = frameinfo.lineno
 				if not callable(getattr(USBTT, 'USBTT_ReadByte', None)):
 					USBTT = None
 					frameinfo = getframeinfo(currentframe())
@@ -117,14 +113,10 @@ class IndexingThread(threading.Thread):
 		self.daemon = True
 	def run(self):
 		global lastReceivedIndex
-		global synthFlushed
 		# The TT uses indexes 0-99 so we map the NVDA indexes to this and when we receive a TT index we send back the correct NVDA index
 #		log.warning("index thread %d" % threading.current_thread().ident) # uncomment this to get the indexing thread it in the nvda log for performance profiling
 		while not stopIndexing:
-			if lastSentIndex-1 == lastReceivedIndex:
-				# we've received all sent indexes so set synthFlushed to True to notify the index thread to wait and the cancel routine to no longer send flushes until more text is being sent.
-				synthFlushed = True
-			if synthFlushed or not USBTT:
+			if lastSentIndex-1 == lastReceivedIndex or synthFlushed or not USBTT:
 				indexesAvailable.clear()
 				indexesAvailable.wait()
 			time.sleep(milliseconds/1000)
@@ -187,7 +179,6 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		self.nvda_rate = 40
 		self.tt_pitch=50
 		self.tt_pitchChanged = False
-		self.capPitch = False
 		self.tt_inflection=5
 		self.tt_inflectionChanged = False
 		self.nvda_inflection = 50
@@ -207,10 +198,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		if USBTT:
 			init_string = b"\x18\x1e\x017b\r"
 			for element in init_string:
-				if element == 0x1e:
-					USBTT.USBTT_WriteByteImmediate(element)
-				else:
-					USBTT.USBTT_WriteByte(element)
+				USBTT.USBTT_WriteByte(element)
 		else:
 			sys.tracebacklimit = 0
 			raise RuntimeError("No TripleTalk drivers available problem line %d" % exceptionLine)
@@ -237,7 +225,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 			return
 		global milliseconds
 		global changedDesktop
-		text_list = []
+		text = ""
 		characterMode = False
 		for item in speechSequence:
 			if isinstance(item, CharacterModeCommand):
@@ -272,7 +260,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 						# stop the synth from saying metric stuff like liters, grams, etc
 						# fix date stuff like 1st, 2nd, 3rd, 4th, etc
 						# fix words that NVDA splits that it shouldn't like McDonalds
-						if elementIndex < itemIndex: # skip the indexes we already processed for point, leading zeros, money, metric stuff, or date stuff the previous time through the loop
+						if elementIndex < itemIndex: # skip the indexes we already processed for point, comma, leading zeros, money, metric stuff, or date stuff the previous time through the loop
 							continue
 						itemIndex = 0
 						if (((element == 'n' or element == 'N' or element == 'r' or element == 'R') and elementIndex+1 in range(itemLen) and (item[elementIndex+1] == 'd' or item[elementIndex+1] == 'D')) or
@@ -300,13 +288,41 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 									item_list[itemIndex] = "o "
 									itemIndex+=1
 						elif element == ',':
-							if elementIndex > 0 and item[elementIndex-1].isnumeric() and elementIndex+1 in range(itemLen) and item[elementIndex+1].isnumeric:
-								if not item_list: item_list = list(item)
-								item_list[elementIndex] = ""
+							if elementIndex > 0 and item[elementIndex-1].isnumeric():
+								commaIndex = elementIndex
+								itemIndex = elementIndex
+								numDigits = 0
+								while itemIndex in range(itemLen):
+									if not item[itemIndex].isnumeric() and not item[itemIndex] == ',':
+										break
+									if item[itemIndex].isnumeric():
+										numDigits +=1
+									elif item[itemIndex] == ',':
+										if not item_list: item_list = list(item)
+										if numDigits == 3 or (numDigits == 0 and itemIndex+1 in range(itemLen) and item[itemIndex+1].isalpha()):
+										# the second half of this if is for metric processing
+											item_list[commaIndex] = ""
+										elif numDigits > 0:
+											item_list[commaIndex] = " "
+										numDigits = 0
+										commaIndex = itemIndex
+									itemIndex+=1
+								if numDigits:
+									if not item_list: item_list = list(item)
+									if numDigits == 3 or (numDigits == 0 and itemIndex+1 in range(itemLen) and item[itemIndex+1].isalpha()):
+									# the second half of this if is for metric processing
+										item_list[commaIndex] = ""
+									elif numDigits > 0:
+										item_list[commaIndex] = " "
 						elif element == ' ': # stop the synth from saying metric items like liter, gram, etc and fix words like McDonalds
 							# NVDA splitting words of mixed case is bad for things like McDonalds so prevent it
 							if elementIndex >= 2 and item[elementIndex-1] == 'c' and item[elementIndex-2] == 'M':
 								if not item_list: item_list = list(item)
+								item_list[elementIndex] = ""
+							elif (elementIndex > 1 and item[elementIndex-2].isnumeric() and elementIndex+1 in range(itemLen) and item[elementIndex+1].isalpha() and
+							(item[elementIndex-1] == ':' or item[elementIndex-1] == ',')):
+								if not item_list: item_list = list(item)
+								item_list[elementIndex-1] = ""
 								item_list[elementIndex] = ""
 							elif elementIndex > 0 and item[elementIndex-1].isnumeric():
 								itemIndex = elementIndex
@@ -409,31 +425,35 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 										item_list[itemIndex] = moneyString
 										itemIndex+=2
 						elif element == ':':
-							allowOClock = True
-							hasSeconds = False
-							if elementIndex >= 3 and item[elementIndex-3] == ':':
-								hasSeconds = True
-							if elementIndex >= 2 and item[elementIndex-1] == '0' and item[elementIndex-2] == '0':
-								if not hasSeconds:
-									if not item_list: item_list = list(item)
-									item_list[elementIndex	-2] = "zero "
-							if elementIndex == 0 or item[elementIndex-1] == '0':
-								allowOClock = False
-							if elementIndex >= 2 and item[elementIndex-2] == '1': #for 10 o clock
-								allowOClock = True
-						if element == ':' and elementIndex+2 in range(itemLen) and item[elementIndex+1] == '0':
-							if not item_list: item_list = list(item)
-							if allowOClock and not hasSeconds:
-								if item[elementIndex+2].isnumeric():
-									item_list[elementIndex+1] = "o "
+							if elementIndex > 0 and item[elementIndex-1].isnumeric() and elementIndex+1 in range(itemLen) and item[elementIndex+1].isalpha(): # this is for metric processing
+								if not item_list: item_list = list(item)
+								item_list[elementIndex] = ""
 							else:
-								item_list[elementIndex+1] = "zero "
-							if item[elementIndex+2] == '0':
+								allowOClock = True
+								hasSeconds = False
+								if elementIndex >= 3 and item[elementIndex-3] == ':':
+									hasSeconds = True
+								if elementIndex >= 2 and item[elementIndex-1] == '0' and item[elementIndex-2] == '0':
+									if not hasSeconds:
+										if not item_list: item_list = list(item)
+										item_list[elementIndex	-2] = "zero "
+								if elementIndex == 0 or item[elementIndex-1] == '0':
+									allowOClock = False
+								if elementIndex >= 2 and item[elementIndex-2] == '1': #for 10 o clock
+									allowOClock = True
+							if element == ':' and elementIndex+2 in range(itemLen) and item[elementIndex+1] == '0':
 								if not item_list: item_list = list(item)
 								if allowOClock and not hasSeconds:
-									item_list[elementIndex+2] = "clock "
+									if item[elementIndex+2].isnumeric():
+										item_list[elementIndex+1] = "o "
 								else:
-									item_list[elementIndex+2] = "zero "
+									item_list[elementIndex+1] = "zero "
+								if item[elementIndex+2] == '0':
+									if not item_list: item_list = list(item)
+									if allowOClock and not hasSeconds:
+										item_list[elementIndex+2] = "clock "
+									else:
+										item_list[elementIndex+2] = "zero "
 						elif element == '0':
 							if elementIndex == 0 or (elementIndex > 0 and item[elementIndex-1] == ' ' and elementIndex+1 in range(itemLen) and not item[elementIndex+1] == ' '):
 								tempIndex = elementIndex
@@ -444,7 +464,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 									elif item[tempIndex] != '0':
 										break
 									tempIndex +=1
-								if tempIndex:
+								if tempIndex and tempIndex+1 in range(itemLen) and item[tempIndex+1] != ':': # the part after testing tempIndex prevents leading zeros on time
 									itemIndex = tempIndex
 									tempIndex -=1
 									if not item_list: item_list = list(item)
@@ -584,26 +604,21 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 					255:"y diaeresis" }
 				if characterMode and itemLen == 1 and ord(item) in upperAscii:
 					item = upperAscii[ord(item)]
-				text_list.append(item)
-				# when NVDA sends shortcut characters such as alt n it doesn't put a space after the shortcut and this synthesizer needs that to not run it together the next word
-				if characterMode:
-						text_list.append(" ")
+				text += item
 			elif isinstance(item, IndexCommand):
 				global lastSentIndex
 				global nvdaIndexes
-				text_list.append("\x1e\x01%di" % lastSentIndex)
+				text += "\x01%di" % lastSentIndex
 				nvdaIndexes[lastSentIndex] = item.index
 				lastSentIndex += 1
 				if lastSentIndex == 100:
 					lastSentIndex = 0
 			elif isinstance(item, PitchCommand):
-				self.capPitch = True
 				offsetPitch = self.tt_pitch + item.offset
 				if offsetPitch > self.maxPitch:
 					offsetPitch = self.maxPitch
-				text_list.append("\x1e\x01%dp" % offsetPitch)
+				text += "\x01%dp" % offsetPitch
 
-		text = "".join(text_list)
 		text = text.encode('ascii', 'replace')
 		textLength = len(text)
 		# only resend the speech parameters when the foreground window changes or when the desktop changes.
@@ -618,39 +633,32 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 			changedDesktop = False
 		params = b""
 		if self.tt_variantChanged:
-			params = ("\x1e\x01%so\x01%ds\x01%dp\x01%de\x01%dv" % (self.tt_variant, self.tt_rate, self.tt_pitch, self.tt_inflection, self.tt_volume)).encode('ascii', 'replace')
+			params = ("\x01%so\x01%ds\x01%dp\x01%de\x01%dv" % (self.tt_variant, self.tt_rate, self.tt_pitch, self.tt_inflection, self.tt_volume)).encode('ascii', 'replace')
 			self.tt_variantChanged = False
 			self.tt_rateChanged = False
 			self.tt_pitchChanged = False
 			self.tt_volumeChanged = False
 			self.tt_inflectionChanged = False
 		if self.tt_rateChanged:
-			params += ("\x1e\x01%ds" % self.tt_rate).encode('ascii', 'replace')
+			params += ("\x01%ds" % self.tt_rate).encode('ascii', 'replace')
 			self.tt_rateChanged = False
 		if self.tt_pitchChanged:
-			params += ("\x1e\x01%dp" % self.tt_pitch).encode('ascii', 'replace')
+			params += ("\x01%dp" % self.tt_pitch).encode('ascii', 'replace')
 			self.tt_pitchChanged = False
 		if self.tt_volumeChanged:
-			params += ("\x1e\x01%dv" % self.tt_volume).encode('ascii', 'replace')
+			params += ("\x01%dv" % self.tt_volume).encode('ascii', 'replace')
 			self.tt_volumeChanged = False
 		if self.tt_inflectionChanged:
-			params += ("\x1e\x01%de" % self.tt_inflection).encode('ascii', 'replace')
+			params += ("\x01%de" % self.tt_inflection).encode('ascii', 'replace')
 			self.tt_inflectionChanged = False
-		text = b"%s %s %s" % (params, text, b"\r")
+		text = b"%s%s%s" % (params, text, b"\r")
 		if characterMode or textLength < 10:
 			milliseconds = 10 # for short strings use 10 milliseconds to keep things responsive
 		else:
 			milliseconds = 100 # for long strings use 100 milliseconds as to not hammer the synth for index marks and waste CPU
-		# Sometimes the synth can get stuck with the cap pitch offset this forces it to reset pitch after changing pitch offset for caps
-		if self.capPitch:
-			self.tt_pitchChanged = True
-			self.capPitch = False
 		# don't use WriteString because it has performance issues, causes other strange behavior, and is just meant for quick testing
 		for element in text:
-			if element == 0x1e:
-				USBTT.USBTT_WriteByteImmediate(element)
-			else:
-				USBTT.USBTT_WriteByte(element)
+			USBTT.USBTT_WriteByte(element)
 		global synthFlushed
 		synthFlushed = False
 		indexesAvailable.set()

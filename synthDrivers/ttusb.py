@@ -74,6 +74,10 @@ def load_dll(load):
 					USBTT = None
 					frameinfo = getframeinfo(currentframe())
 					exceptionLine = frameinfo.lineno
+				if not callable(getattr(USBTT, 'USBTT_WriteByteImmediate', None)):
+					USBTT = None
+					frameinfo = getframeinfo(currentframe())
+					exceptionLine = frameinfo.lineno
 				if not callable(getattr(USBTT, 'USBTT_ReadByte', None)):
 					USBTT = None
 					frameinfo = getframeinfo(currentframe())
@@ -198,7 +202,10 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 		if USBTT:
 			init_string = b"\x18\x1e\x017b\r"
 			for element in init_string:
-				USBTT.USBTT_WriteByte(element)
+				if element == 0x1e:
+					USBTT.USBTT_WriteByteImmediate(element)
+				else:
+					USBTT.USBTT_WriteByte(element)
 		else:
 			sys.tracebacklimit = 0
 			raise RuntimeError("No TripleTalk drivers available problem line %d" % exceptionLine)
@@ -608,7 +615,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 			elif isinstance(item, IndexCommand):
 				global lastSentIndex
 				global nvdaIndexes
-				text += "\x01%di" % lastSentIndex
+				text += "\x1e\x01%di" % lastSentIndex
 				nvdaIndexes[lastSentIndex] = item.index
 				lastSentIndex += 1
 				if lastSentIndex == 100:
@@ -617,7 +624,7 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 				offsetPitch = self.tt_pitch + item.offset
 				if offsetPitch > self.maxPitch:
 					offsetPitch = self.maxPitch
-				text += "\x01%dp" % offsetPitch
+				text += "\x1e\x01%dp" % offsetPitch
 
 		text = text.encode('ascii', 'replace')
 		textLength = len(text)
@@ -633,23 +640,23 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 			changedDesktop = False
 		params = b""
 		if self.tt_variantChanged:
-			params = ("\x01%so\x01%ds\x01%dp\x01%de\x01%dv" % (self.tt_variant, self.tt_rate, self.tt_pitch, self.tt_inflection, self.tt_volume)).encode('ascii', 'replace')
+			params = ("\x1e\x01%so\x01%ds\x01%dp\x01%de\x01%dv" % (self.tt_variant, self.tt_rate, self.tt_pitch, self.tt_inflection, self.tt_volume)).encode('ascii', 'replace')
 			self.tt_variantChanged = False
 			self.tt_rateChanged = False
 			self.tt_pitchChanged = False
 			self.tt_volumeChanged = False
 			self.tt_inflectionChanged = False
 		if self.tt_rateChanged:
-			params += ("\x01%ds" % self.tt_rate).encode('ascii', 'replace')
+			params += ("\x1e\x01%ds" % self.tt_rate).encode('ascii', 'replace')
 			self.tt_rateChanged = False
 		if self.tt_pitchChanged:
-			params += ("\x01%dp" % self.tt_pitch).encode('ascii', 'replace')
+			params += ("\x1e\x01%dp" % self.tt_pitch).encode('ascii', 'replace')
 			self.tt_pitchChanged = False
 		if self.tt_volumeChanged:
-			params += ("\x01%dv" % self.tt_volume).encode('ascii', 'replace')
+			params += ("\x1e\x01%dv" % self.tt_volume).encode('ascii', 'replace')
 			self.tt_volumeChanged = False
 		if self.tt_inflectionChanged:
-			params += ("\x01%de" % self.tt_inflection).encode('ascii', 'replace')
+			params += ("\x1e\x01%de" % self.tt_inflection).encode('ascii', 'replace')
 			self.tt_inflectionChanged = False
 		text = b"%s%s%s" % (params, text, b"\r")
 		if characterMode or textLength < 10:
@@ -658,7 +665,10 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 			milliseconds = 100 # for long strings use 100 milliseconds as to not hammer the synth for index marks and waste CPU
 		# don't use WriteString because it has performance issues, causes other strange behavior, and is just meant for quick testing
 		for element in text:
-			USBTT.USBTT_WriteByte(element)
+			if element == 0x1e:
+				USBTT.USBTT_WriteByteImmediate(element)
+			else:
+				USBTT.USBTT_WriteByte(element)
 		global synthFlushed
 		synthFlushed = False
 		indexesAvailable.set()

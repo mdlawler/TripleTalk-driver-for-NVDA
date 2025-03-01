@@ -458,10 +458,9 @@ class SynthDriver(synthDriverHandler.SynthDriver):
 							if elementIndex == 0 or (elementIndex > 0 and item[elementIndex-1] == ' ' and elementIndex+1 in range(itemLen) and not item[elementIndex+1] == ' '):
 								tempIndex = elementIndex
 								while tempIndex in range(itemLen):
-									if item[tempIndex] == ':':
-										tempIndex = 0
-										break
-									elif item[tempIndex] != '0':
+									if item[tempIndex] != '0':
+										if item[tempIndex] == ':':
+											tempIndex = 0
 										break
 									tempIndex +=1
 								if tempIndex and tempIndex+1 in range(itemLen) and item[tempIndex+1] != ':': # the part after testing tempIndex prevents leading zeros on time
